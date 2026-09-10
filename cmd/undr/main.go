@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"slices"
 	"strconv"
@@ -32,6 +33,11 @@ type config struct {
 	}
 }
 
+type application struct {
+	config config
+	logger *slog.Logger
+}
+
 func main() {
 	err := godotenv.Load()
 	if err != nil {
@@ -42,13 +48,20 @@ func main() {
 	var cfg config
 	loadConfig(&cfg)
 
-	fmt.Println("port: ", cfg.port)
-	fmt.Println("env: ", cfg.env)
-	fmt.Println("dsn: ", cfg.db.dsn)
-	fmt.Println("max-open-conns: ", cfg.db.maxOpenConns)
-	fmt.Println("max-idle-conns: ", cfg.db.maxIdleConns)
-	fmt.Println("max-idle-time: ", cfg.db.maxIdleTime)
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
+	app := &application{
+		config: cfg,
+		logger: logger,
+	}
+
+	app.logger.Info("starting app",
+		"port", app.config.port,
+		"env", app.config.env,
+		"dsn", app.config.db.dsn,
+		"max-open-conns", app.config.db.maxOpenConns,
+		"max-idle-conns", app.config.db.maxIdleConns,
+		"max-idle-time", app.config.db.maxIdleTime)
 }
 
 func loadConfig(cfg *config) {
