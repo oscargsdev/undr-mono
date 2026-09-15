@@ -13,7 +13,6 @@ const (
 	DefaultEnv          = "devtest"
 	DefaultDSN          = "postgrestest"
 	DefaultMaxOpenConns = 250
-	DefaultMaxIdleConns = 250
 	DefaultMaxIdleTime  = 150
 )
 
@@ -25,7 +24,6 @@ type config struct {
 	db   struct {
 		dsn          string
 		maxOpenConns int
-		maxIdleConns int
 		maxIdleTime  time.Duration
 	}
 }
@@ -71,18 +69,6 @@ func loadConfig(cfg *config) {
 			os.Exit(1)
 		}
 		cfg.db.maxOpenConns = maxOpenConns
-	}
-
-	maxIdleConnsStr := os.Getenv("MAX_IDLE_CONNS")
-	if maxIdleConnsStr == "" {
-		cfg.db.maxIdleConns = DefaultMaxIdleConns
-	} else {
-		maxIdleConns, err := strconv.Atoi(maxIdleConnsStr)
-		if err != nil {
-			fmt.Printf("error loading max idle connections: %v \n", err)
-			os.Exit(1)
-		}
-		cfg.db.maxIdleConns = maxIdleConns
 	}
 
 	maxIdleTimeStr := os.Getenv("MAX_IDLE_TIME")
