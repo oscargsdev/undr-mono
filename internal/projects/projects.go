@@ -22,7 +22,7 @@ type ProjectModel struct {
 	db *pgxpool.Pool
 }
 
-func (m ProjectModel) GetProject(id int64) (*Project, error) {
+func (m ProjectModel) GetProject(ctx context.Context, id int64) (*Project, error) {
 	if id < 1 {
 		return nil, ErrRecordNotFound
 	}
@@ -33,10 +33,11 @@ func (m ProjectModel) GetProject(id int64) (*Project, error) {
 		WHERE id = $1`
 
 	var project Project
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+
+	queryCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
 
-	err := m.db.QueryRow(ctx, query, id).Scan(
+	err := m.db.QueryRow(queryCtx, query, id).Scan(
 		&project.ID,
 		&project.Name,
 	)

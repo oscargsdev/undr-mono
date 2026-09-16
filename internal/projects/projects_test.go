@@ -1,8 +1,10 @@
 package projects
 
 import (
+	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/oscargsdev/undr-mono/internal/config"
 	"github.com/oscargsdev/undr-mono/internal/database"
@@ -24,7 +26,7 @@ func TestGetProject(t *testing.T) {
 
 	for _, tc := range testsExistingProjects {
 		t.Run(tc.name, func(t *testing.T) {
-			project, err := model.GetProject(tc.id)
+			project, err := model.GetProject(t.Context(), tc.id)
 			if err != nil {
 				t.Fatalf("failed to get project %v: %v", tc.id, err)
 			}
@@ -46,7 +48,7 @@ func TestGetProject(t *testing.T) {
 
 	for _, tc := range testsNonExistingProjects {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := model.GetProject(tc.id)
+			_, err := model.GetProject(t.Context(), tc.id)
 			if err == nil {
 				t.Fatal("expected error")
 			}
@@ -66,7 +68,10 @@ func getModel(t testing.TB) *ProjectModel {
 		t.Fatalf("error while loading config from env: %v", err)
 	}
 
-	db, err := database.OpenDB(cfg)
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+
+	db, err := database.OpenDB(ctx, cfg)
 	if err != nil {
 		t.Fatalf("error opening db connection: %v", err)
 	}

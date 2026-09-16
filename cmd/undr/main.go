@@ -1,9 +1,11 @@
 package main
 
 import (
+	"context"
 	"log/slog"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/oscargsdev/undr-mono/internal/config"
 	"github.com/oscargsdev/undr-mono/internal/database"
@@ -25,7 +27,10 @@ func main() {
 	}
 	logger.Info("configuration loaded")
 
-	db, err := database.OpenDB(cfg)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	db, err := database.OpenDB(ctx, cfg)
 	if err != nil {
 		logger.Error("error while opening database connection", "error", err.Error())
 		os.Exit(1)

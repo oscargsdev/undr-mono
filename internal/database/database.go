@@ -2,29 +2,25 @@ package database
 
 import (
 	"context"
-	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/oscargsdev/undr-mono/internal/config"
 )
 
-func OpenDB(cfg *config.Config) (*pgxpool.Pool, error) {
-	config, err := pgxpool.ParseConfig(cfg.DB.DSN)
+func OpenDB(ctx context.Context, cfg *config.Config) (*pgxpool.Pool, error) {
+	poolConfig, err := pgxpool.ParseConfig(cfg.DB.DSN)
 	if err != nil {
 		return nil, err
 	}
 
 	// TODO: More defaults for db config?
-	config.MaxConns = int32(cfg.DB.MaxOpenConns)
-	config.MaxConnIdleTime = cfg.DB.MaxIdleTime
+	poolConfig.MaxConns = int32(cfg.DB.MaxOpenConns)
+	poolConfig.MaxConnIdleTime = cfg.DB.MaxIdleTime
 
-	db, err := pgxpool.NewWithConfig(context.Background(), config)
+	db, err := pgxpool.NewWithConfig(ctx, poolConfig)
 	if err != nil {
 		return nil, err
 	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
 
 	err = db.Ping(ctx)
 	if err != nil {
