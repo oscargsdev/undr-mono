@@ -34,9 +34,7 @@ type Config struct {
 func LoadFromEnv(filenames ...string) (*Config, error) {
 	err := godotenv.Load(filenames...)
 	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			fmt.Printf("using default configs, error while loading the environment file: %v\n", err)
-		} else {
+		if !errors.Is(err, os.ErrNotExist) {
 			return nil, fmt.Errorf("error while loading the environment file: %w", err)
 		}
 	}
@@ -49,7 +47,6 @@ func LoadConfig() (*Config, error) {
 
 	portStr := os.Getenv("PORT")
 	if portStr == "" {
-		informEmptyValue("PORT")
 		cfg.Port = DefaultPort
 	} else {
 		port, err := strconv.Atoi(portStr)
@@ -61,7 +58,6 @@ func LoadConfig() (*Config, error) {
 
 	envStr := os.Getenv("ENV")
 	if envStr == "" {
-		informEmptyValue("ENV")
 		cfg.Env = DefaultEnv
 	} else {
 		if !slices.Contains(validEnvs, envStr) {
@@ -72,15 +68,13 @@ func LoadConfig() (*Config, error) {
 
 	dsnStr := os.Getenv("DSN")
 	if dsnStr == "" {
-		informEmptyValue("DSN")
 		cfg.DB.DSN = DefaultDSN
 	} else {
-		cfg.DB.DSN = os.Getenv("DSN")
+		cfg.DB.DSN = dsnStr
 	}
 
 	maxOpenConnsStr := os.Getenv("MAX_OPEN_CONNS")
 	if maxOpenConnsStr == "" {
-		informEmptyValue("MAX_OPEN_CONNS")
 		cfg.DB.MaxOpenConns = DefaultMaxOpenConns
 	} else {
 		maxOpenConns, err := strconv.Atoi(maxOpenConnsStr)
@@ -92,7 +86,6 @@ func LoadConfig() (*Config, error) {
 
 	maxIdleTimeStr := os.Getenv("MAX_IDLE_TIME")
 	if maxIdleTimeStr == "" {
-		informEmptyValue("MAX_IDLE_TIME")
 		cfg.DB.MaxIdleTime = time.Duration(DefaultMaxIdleTime) * time.Minute
 	} else {
 		maxIdleTime, err := strconv.Atoi(maxIdleTimeStr)
@@ -103,8 +96,4 @@ func LoadConfig() (*Config, error) {
 	}
 
 	return &cfg, nil
-}
-
-func informEmptyValue(envVar string) {
-	fmt.Printf("empty value for %v, using default value\n", envVar)
 }
