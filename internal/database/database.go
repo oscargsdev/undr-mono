@@ -7,6 +7,7 @@ import (
 	"github.com/oscargsdev/undr-mono/internal/config"
 )
 
+// OpenDB creates a PostgreSQL connection pool using cfg and verifies connectivity.
 func OpenDB(ctx context.Context, cfg *config.Config) (*pgxpool.Pool, error) {
 	poolConfig, err := pgxpool.ParseConfig(cfg.DB.DSN)
 	if err != nil {

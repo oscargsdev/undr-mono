@@ -12,15 +12,16 @@ import (
 )
 
 const (
-	DefaultPort         = 4000
-	DefaultEnv          = "dev"
-	DefaultDSN          = "postgres://undr:pa55word@localhost:5431/undr-db?sslmode=disable"
-	DefaultMaxOpenConns = 25
-	DefaultMaxIdleTime  = 15
+	defaultPort         = 4000
+	defaultEnv          = "dev"
+	defaultDSN          = "postgres://undr:pa55word@localhost:5431/undr-db?sslmode=disable"
+	defaultMaxOpenConns = 25
+	defaultMaxIdleTime  = 15
 )
 
 var validEnvs = []string{"dev", "staging", "prod"}
 
+// Config contains the server and database configuration.
 type Config struct {
 	Port int
 	Env  string
@@ -31,6 +32,8 @@ type Config struct {
 	}
 }
 
+// LoadFromEnv loads optional dotenv files and constructs a Config from
+// environment variables and defaults.
 func LoadFromEnv(filenames ...string) (*Config, error) {
 	err := godotenv.Load(filenames...)
 	if err != nil {
@@ -39,15 +42,15 @@ func LoadFromEnv(filenames ...string) (*Config, error) {
 		}
 	}
 
-	return LoadConfig()
+	return loadConfig()
 }
 
-func LoadConfig() (*Config, error) {
+func loadConfig() (*Config, error) {
 	var cfg Config
 
 	portStr := os.Getenv("PORT")
 	if portStr == "" {
-		cfg.Port = DefaultPort
+		cfg.Port = defaultPort
 	} else {
 		port, err := strconv.Atoi(portStr)
 		if err != nil {
@@ -58,7 +61,7 @@ func LoadConfig() (*Config, error) {
 
 	envStr := os.Getenv("ENV")
 	if envStr == "" {
-		cfg.Env = DefaultEnv
+		cfg.Env = defaultEnv
 	} else {
 		if !slices.Contains(validEnvs, envStr) {
 			return nil, fmt.Errorf("invalid ENV value %q, expected one from %v", envStr, validEnvs)
@@ -68,14 +71,14 @@ func LoadConfig() (*Config, error) {
 
 	dsnStr := os.Getenv("DSN")
 	if dsnStr == "" {
-		cfg.DB.DSN = DefaultDSN
+		cfg.DB.DSN = defaultDSN
 	} else {
 		cfg.DB.DSN = dsnStr
 	}
 
 	maxOpenConnsStr := os.Getenv("MAX_OPEN_CONNS")
 	if maxOpenConnsStr == "" {
-		cfg.DB.MaxOpenConns = DefaultMaxOpenConns
+		cfg.DB.MaxOpenConns = defaultMaxOpenConns
 	} else {
 		maxOpenConns, err := strconv.Atoi(maxOpenConnsStr)
 		if err != nil {
@@ -86,7 +89,7 @@ func LoadConfig() (*Config, error) {
 
 	maxIdleTimeStr := os.Getenv("MAX_IDLE_TIME")
 	if maxIdleTimeStr == "" {
-		cfg.DB.MaxIdleTime = time.Duration(DefaultMaxIdleTime) * time.Minute
+		cfg.DB.MaxIdleTime = time.Duration(defaultMaxIdleTime) * time.Minute
 	} else {
 		maxIdleTime, err := strconv.Atoi(maxIdleTimeStr)
 		if err != nil {
