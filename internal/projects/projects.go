@@ -22,7 +22,11 @@ type ProjectModel struct {
 	db *pgxpool.Pool
 }
 
-func (m ProjectModel) GetProject(ctx context.Context, id int64) (*Project, error) {
+func NewProjectModel(db *pgxpool.Pool) *ProjectModel {
+	return &ProjectModel{db: db}
+}
+
+func (m *ProjectModel) GetProject(ctx context.Context, id int64) (*Project, error) {
 	if id < 1 {
 		return nil, ErrRecordNotFound
 	}

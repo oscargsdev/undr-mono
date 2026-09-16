@@ -76,9 +76,5 @@ func getModel(t testing.TB) *ProjectModel {
 		t.Fatalf("error opening db connection: %v", err)
 	}
 
-	model := ProjectModel{
-		db: db,
-	}
-
-	return &model
+	return NewProjectModel(db)
 }
