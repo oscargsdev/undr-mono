@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"slices"
@@ -11,11 +12,11 @@ import (
 )
 
 const (
-	DefaultPort         = 4004
-	DefaultEnv          = "devtest"
-	DefaultDSN          = "postgrestest"
-	DefaultMaxOpenConns = 250
-	DefaultMaxIdleTime  = 150
+	DefaultPort         = 4000
+	DefaultEnv          = "dev"
+	DefaultDSN          = "postgres://undr:pa55word@localhost:5431/undr-db?sslmode=disable"
+	DefaultMaxOpenConns = 25
+	DefaultMaxIdleTime  = 15
 )
 
 var validEnvs = []string{"dev", "staging", "prod"}
@@ -33,7 +34,11 @@ type Config struct {
 func LoadFromEnv(filenames ...string) (*Config, error) {
 	err := godotenv.Load(filenames...)
 	if err != nil {
-		return nil, fmt.Errorf("load environment file: %w", err)
+		if errors.Is(err, os.ErrNotExist) {
+			fmt.Printf("using default configs, error while loading the environment file: %v\n", err)
+		} else {
+			return nil, fmt.Errorf("error while loading the environment file: %w", err)
+		}
 	}
 
 	return LoadConfig()
@@ -44,6 +49,7 @@ func LoadConfig() (*Config, error) {
 
 	portStr := os.Getenv("PORT")
 	if portStr == "" {
+		informEmptyValue("PORT")
 		cfg.Port = DefaultPort
 	} else {
 		port, err := strconv.Atoi(portStr)
@@ -55,6 +61,7 @@ func LoadConfig() (*Config, error) {
 
 	envStr := os.Getenv("ENV")
 	if envStr == "" {
+		informEmptyValue("ENV")
 		cfg.Env = DefaultEnv
 	} else {
 		if !slices.Contains(validEnvs, envStr) {
@@ -65,6 +72,7 @@ func LoadConfig() (*Config, error) {
 
 	dsnStr := os.Getenv("DSN")
 	if dsnStr == "" {
+		informEmptyValue("DSN")
 		cfg.DB.DSN = DefaultDSN
 	} else {
 		cfg.DB.DSN = os.Getenv("DSN")
@@ -72,6 +80,7 @@ func LoadConfig() (*Config, error) {
 
 	maxOpenConnsStr := os.Getenv("MAX_OPEN_CONNS")
 	if maxOpenConnsStr == "" {
+		informEmptyValue("MAX_OPEN_CONNS")
 		cfg.DB.MaxOpenConns = DefaultMaxOpenConns
 	} else {
 		maxOpenConns, err := strconv.Atoi(maxOpenConnsStr)
@@ -83,6 +92,7 @@ func LoadConfig() (*Config, error) {
 
 	maxIdleTimeStr := os.Getenv("MAX_IDLE_TIME")
 	if maxIdleTimeStr == "" {
+		informEmptyValue("MAX_IDLE_TIME")
 		cfg.DB.MaxIdleTime = time.Duration(DefaultMaxIdleTime) * time.Minute
 	} else {
 		maxIdleTime, err := strconv.Atoi(maxIdleTimeStr)
@@ -93,4 +103,8 @@ func LoadConfig() (*Config, error) {
 	}
 
 	return &cfg, nil
+}
+
+func informEmptyValue(envVar string) {
+	fmt.Printf("empty value for %v, using default value\n", envVar)
 }

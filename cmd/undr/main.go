@@ -19,7 +19,7 @@ type application struct {
 func main() {
 	cfg, err := config.LoadFromEnv()
 	if err != nil {
-		fmt.Printf("error while loading config from env: %v", err)
+		fmt.Fprintf(os.Stderr, "error while loading config from env: %v\n", err)
 		os.Exit(1)
 	}
 
