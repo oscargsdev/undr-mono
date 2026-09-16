@@ -1,4 +1,4 @@
-package main
+package config
 
 import (
 	"fmt"
@@ -6,6 +6,8 @@ import (
 	"slices"
 	"strconv"
 	"time"
+
+	"github.com/joho/godotenv"
 )
 
 const (
@@ -18,68 +20,81 @@ const (
 
 var ValidEnvs = []string{"dev", "staging", "prod"}
 
-type config struct {
-	port int
-	env  string
-	db   struct {
-		dsn          string
-		maxOpenConns int
-		maxIdleTime  time.Duration
+type Config struct {
+	Port int
+	Env  string
+	DB   struct {
+		DSN          string
+		MaxOpenConns int
+		MaxIdleTime  time.Duration
 	}
 }
 
-func loadConfig(cfg *config) {
+func LoadFromEnv(filenames ...string) Config {
+	err := godotenv.Load(filenames...)
+	if err != nil {
+		fmt.Printf("error loading .env file: %v", err)
+		os.Exit(1)
+	}
+
+	var cfg Config
+	LoadConfig(&cfg)
+
+	return cfg
+}
+
+func LoadConfig(cfg *Config) {
 	portStr := os.Getenv("PORT")
 	if portStr == "" {
-		cfg.port = DefaultPort
+		cfg.Port = DefaultPort
 	} else {
 		port, err := strconv.Atoi(portStr)
 		if err != nil {
 			fmt.Printf("error loading server port: %v \n", err)
 			os.Exit(1)
 		}
-		cfg.port = port
+		cfg.Port = port
 	}
 
 	envStr := os.Getenv("ENV")
 	if envStr == "" {
-		cfg.env = DefaultEnv
+		cfg.Env = DefaultEnv
 	} else {
 		if !slices.Contains(ValidEnvs, envStr) {
 			fmt.Print("error loading environment: invalid value: ", envStr, "\n")
 			os.Exit(1)
 		}
-		cfg.env = envStr
+		cfg.Env = envStr
 	}
 
 	dsnStr := os.Getenv("DSN")
 	if dsnStr == "" {
-		cfg.db.dsn = DefaultDSN
+		cfg.DB.DSN = DefaultDSN
 	} else {
-		cfg.db.dsn = os.Getenv("DSN")
+		cfg.DB.DSN = os.Getenv("DSN")
 	}
 
 	maxOpenConnsStr := os.Getenv("MAX_OPEN_CONNS")
 	if maxOpenConnsStr == "" {
-		cfg.db.maxOpenConns = DefaultMaxOpenConns
+		cfg.DB.MaxOpenConns = DefaultMaxOpenConns
 	} else {
 		maxOpenConns, err := strconv.Atoi(maxOpenConnsStr)
 		if err != nil {
 			fmt.Printf("error loading max open connections: %v \n", err)
 			os.Exit(1)
 		}
-		cfg.db.maxOpenConns = maxOpenConns
+		cfg.DB.MaxOpenConns = maxOpenConns
 	}
 
 	maxIdleTimeStr := os.Getenv("MAX_IDLE_TIME")
 	if maxIdleTimeStr == "" {
-		cfg.db.maxIdleTime = time.Duration(DefaultMaxIdleTime) * time.Minute
+		cfg.DB.MaxIdleTime = time.Duration(DefaultMaxIdleTime) * time.Minute
 	} else {
 		maxIdleTime, err := strconv.Atoi(maxIdleTimeStr)
 		if err != nil {
 			fmt.Printf("error loading max idle time: %v \n", err)
 			os.Exit(1)
 		}
-		cfg.db.maxIdleTime = time.Duration(maxIdleTime) * time.Minute
+		cfg.DB.MaxIdleTime = time.Duration(maxIdleTime) * time.Minute
 	}
 }
