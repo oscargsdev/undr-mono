@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log/slog"
 	"os"
 	"sync"
@@ -10,13 +11,17 @@ import (
 )
 
 type application struct {
-	config config.Config
+	config *config.Config
 	logger *slog.Logger
 	wg     sync.WaitGroup
 }
 
 func main() {
-	cfg := config.LoadFromEnv()
+	cfg, err := config.LoadFromEnv()
+	if err != nil {
+		fmt.Printf("error while loading config from env: %v", err)
+		os.Exit(1)
+	}
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 

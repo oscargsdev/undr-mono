@@ -61,7 +61,11 @@ func TestGetProject(t *testing.T) {
 func getModel(t testing.TB) *ProjectModel {
 	t.Helper()
 
-	cfg := config.LoadFromEnv("../../.env")
+	cfg, err := config.LoadFromEnv("../../.env")
+	if err != nil {
+		t.Fatalf("error while loading config from env: %v", err)
+	}
+
 	db, err := database.OpenDB(cfg)
 	if err != nil {
 		t.Fatalf("error opening db connection: %v", err)

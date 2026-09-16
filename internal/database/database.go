@@ -8,7 +8,7 @@ import (
 	"github.com/oscargsdev/undr-mono/internal/config"
 )
 
-func OpenDB(cfg config.Config) (*pgxpool.Pool, error) {
+func OpenDB(cfg *config.Config) (*pgxpool.Pool, error) {
 	config, err := pgxpool.ParseConfig(cfg.DB.DSN)
 	if err != nil {
 		return nil, err

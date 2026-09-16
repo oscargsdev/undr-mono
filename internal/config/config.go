@@ -18,7 +18,7 @@ const (
 	DefaultMaxIdleTime  = 150
 )
 
-var ValidEnvs = []string{"dev", "staging", "prod"}
+var validEnvs = []string{"dev", "staging", "prod"}
 
 type Config struct {
 	Port int
@@ -30,28 +30,25 @@ type Config struct {
 	}
 }
 
-func LoadFromEnv(filenames ...string) Config {
+func LoadFromEnv(filenames ...string) (*Config, error) {
 	err := godotenv.Load(filenames...)
 	if err != nil {
-		fmt.Printf("error loading .env file: %v", err)
-		os.Exit(1)
+		return nil, fmt.Errorf("load environment file: %w", err)
 	}
 
-	var cfg Config
-	LoadConfig(&cfg)
-
-	return cfg
+	return LoadConfig()
 }
 
-func LoadConfig(cfg *Config) {
+func LoadConfig() (*Config, error) {
+	var cfg Config
+
 	portStr := os.Getenv("PORT")
 	if portStr == "" {
 		cfg.Port = DefaultPort
 	} else {
 		port, err := strconv.Atoi(portStr)
 		if err != nil {
-			fmt.Printf("error loading server port: %v \n", err)
-			os.Exit(1)
+			return nil, fmt.Errorf("parse PORT %q: %w", portStr, err)
 		}
 		cfg.Port = port
 	}
@@ -60,9 +57,8 @@ func LoadConfig(cfg *Config) {
 	if envStr == "" {
 		cfg.Env = DefaultEnv
 	} else {
-		if !slices.Contains(ValidEnvs, envStr) {
-			fmt.Print("error loading environment: invalid value: ", envStr, "\n")
-			os.Exit(1)
+		if !slices.Contains(validEnvs, envStr) {
+			return nil, fmt.Errorf("invalid ENV value %q, expected one from %v", envStr, validEnvs)
 		}
 		cfg.Env = envStr
 	}
@@ -80,8 +76,7 @@ func LoadConfig(cfg *Config) {
 	} else {
 		maxOpenConns, err := strconv.Atoi(maxOpenConnsStr)
 		if err != nil {
-			fmt.Printf("error loading max open connections: %v \n", err)
-			os.Exit(1)
+			return nil, fmt.Errorf("parse MAX_OPEN_CONNS %q: %w", maxOpenConnsStr, err)
 		}
 		cfg.DB.MaxOpenConns = maxOpenConns
 	}
@@ -92,9 +87,10 @@ func LoadConfig(cfg *Config) {
 	} else {
 		maxIdleTime, err := strconv.Atoi(maxIdleTimeStr)
 		if err != nil {
-			fmt.Printf("error loading max idle time: %v \n", err)
-			os.Exit(1)
+			return nil, fmt.Errorf("parse MAX_IDLE_TIME %q: %w", maxIdleTimeStr, err)
 		}
 		cfg.DB.MaxIdleTime = time.Duration(maxIdleTime) * time.Minute
 	}
+
+	return &cfg, nil
 }
