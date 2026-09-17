@@ -19,48 +19,54 @@ confirm:
 # DEVELOPMENT
 # ==================================================================================== #
 
-## run/undr: run the cmd/undr application
-.PHONY: run/undr
-run/undr:
+## run: run the cmd/undr application
+.PHONY: run
+run:
 	go run ./cmd/undr
 
-## db/psql: connect to the database using psql
-.PHONY: db/sql
-db/psql:
+## test: run all tests
+.PHONY: test
+test:
+	go test ./... -v
+
+
+## db: connect to the database using psql
+.PHONY: db
+db:
 	psql -U postgres ${DSN}
 
-## db/migrations/new name=$1: create a new database migration
-.PHONY: db/migrations/new
-db/migrations/new:
+## migrate/new name=$1: create a new database migration
+.PHONY: migrate/new
+migrate/new:
 	@echo  'Creating migration files for ${name}'
 	migrate create -seq -ext=.sql -dir=./migrations ${name}
 
-## db/migrations/seed/new name=$1: create a new database seed migration
-.PHONY: db/migrations/seed/new
-db/migrations/seed/new:
+## migrate/seed/new name=$1: create a new database seed migration
+.PHONY: migrate/seed/new
+migrate/seed/new:
 	@echo  'Creating migration files for ${name}'
 	migrate create -seq -ext=.sql -dir=./migrations/seed ${name}
 
-## db/migrations/up: apply all up database migrations
-.PHONY: db/migrations/up
-db/migrations/up: confirm
+## migrate/up: apply all up database migrations
+.PHONY: migrate/up
+migrate/up: confirm
 	@echo 'Running up migrations...'
 	migrate -source file://./migrations/ -database ${DSN} up
 
-## db/migrations/seed/up: apply all up database migrations
-.PHONY: db/migrations/seed/up
-db/migrations/seed/up: confirm
+## migrate/seed/up: apply all up database migrations
+.PHONY: migrate/seed/up
+migrate/seed/up: confirm
 	@echo 'Running up seed migrations...'
 	migrate -source file://./migrations/seed/ -database ${DSN} up
 
-## db/migrations/down: apply all down database migrations
-.PHONY: db/migrations/down
-db/migrations/down: confirm
+## migrate/down: apply all down database migrations
+.PHONY: migrate/down
+migrate/down: confirm
 	@echo 'Running down migrations...'
 	migrate -source file://./migrations/ -database ${DSN} down
 
-## db/migrations/seed/down: apply all down database seed migrations
-.PHONY: db/migrations/seed/down
-db/migrations/seed/down: confirm
+## migrate/seed/down: apply all down database seed migrations
+.PHONY: migrate/seed/down
+migrate/seed/down: confirm
 	@echo 'Running down seed migrations...'
 	migrate -source file://./migrations/seed/ -database ${DSN} down
