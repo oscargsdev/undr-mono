@@ -5,11 +5,15 @@ import (
 	"errors"
 	"time"
 
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 var (
+	ErrRecordNotFound       = errors.New("record not found")
+	ErrInvalidID            = errors.New("invalid id")
 	ErrDuplicateID          = errors.New("duplicate id")
 	ErrDuplicateEmail       = errors.New("duplicate email")
 	ErrDuplicateDisplayName = errors.New("duplicate display name")
@@ -44,8 +48,13 @@ func (m *UserModel) Insert(ctx context.Context, user *User) error {
 	queryCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
 
-	err := m.db.QueryRow(queryCtx, query, args...).
-		Scan(&user.ID, &user.Email, &user.DisplayName, &user.Status, &user.CreatedAt, &user.UpdatedAt)
+	err := m.db.QueryRow(queryCtx, query, args...).Scan(
+		&user.ID,
+		&user.Email,
+		&user.DisplayName,
+		&user.Status,
+		&user.CreatedAt,
+		&user.UpdatedAt)
 
 	if err != nil {
 		var pgErr *pgconn.PgError
@@ -70,4 +79,39 @@ func (m *UserModel) Insert(ctx context.Context, user *User) error {
 		}
 	}
 	return err
+}
+
+func (m *UserModel) Get(ctx context.Context, id UserID) (*User, error) {
+	parsedID, err := uuid.Parse(string(id))
+	if err != nil {
+		return nil, ErrInvalidID
+	}
+
+	query := `
+		SELECT id, email, display_name, status, created_at, updated_at
+		FROM users WHERE id = $1`
+
+	queryCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+
+	var user User
+
+	err = m.db.QueryRow(queryCtx, query, parsedID).Scan(
+		&user.ID,
+		&user.Email,
+		&user.DisplayName,
+		&user.Status,
+		&user.CreatedAt,
+		&user.UpdatedAt)
+
+	if err != nil {
+		switch {
+		case errors.Is(err, pgx.ErrNoRows):
+			return nil, ErrRecordNotFound
+		default:
+			return nil, err
+		}
+	}
+
+	return &user, nil
 }
