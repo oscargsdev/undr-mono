@@ -42,101 +42,99 @@ var testUsers = []User{
 
 func TestInsert(t *testing.T) {
 	model := getModel(t)
-	deleteAllUsers(t, model.db)
-	t.Cleanup(func() { deleteAllUsers(t, model.db) })
+	deleteTestUsers(t, model.db)
+	t.Cleanup(func() { deleteTestUsers(t, model.db) })
 
 	expectedUser := testUsers[0]
 	user := expectedUser
 
 	err := model.Insert(t.Context(), &user)
 	if err != nil {
-		t.Fatalf("did not expect error: %v", err)
+		t.Fatalf("Insert() error = %v; want nil", err)
 	}
 
 	if user.ID != expectedUser.ID {
-		t.Fatalf("user id expected %q, got %q", expectedUser.ID, user.ID)
+		t.Errorf("Insert() ID = %q; want %q", user.ID, expectedUser.ID)
 	}
 
 	if user.Email != expectedUser.Email {
-		t.Fatalf("user email expected %q, got %q", expectedUser.Email, user.Email)
+		t.Errorf("Insert() Email = %q; want %q", user.Email, expectedUser.Email)
 	}
 
 	if user.DisplayName != expectedUser.DisplayName {
-		t.Fatalf("user display name expected %q, got %q", expectedUser.DisplayName, user.DisplayName)
+		t.Errorf("Insert() DisplayName = %q; want %q", user.DisplayName, expectedUser.DisplayName)
 	}
 
 	if user.Status != expectedUser.Status {
-		t.Fatalf("user status expected %q, got %q", expectedUser.Status, user.Status)
+		t.Errorf("Insert() Status = %q; want %q", user.Status, expectedUser.Status)
 	}
 
 	if user.CreatedAt.IsZero() {
-		t.Fatal("expected non-zero value for user created at")
+		t.Error("Insert() CreatedAt is zero; want non-zero")
 	}
 
 	if user.UpdatedAt.IsZero() {
-		t.Fatal("expected non-zero value for user updated at")
+		t.Error("Insert() UpdatedAt is zero; want non-zero")
+	}
+
+	if !user.CreatedAt.Equal(user.UpdatedAt) {
+		t.Errorf("Insert() CreatedAt = %v, UpdatedAt = %v; want equal timestamps", user.CreatedAt, user.UpdatedAt)
 	}
 }
 
 func TestInsertDuplicatedUser(t *testing.T) {
 	model := getModel(t)
-	deleteAllUsers(t, model.db)
-	t.Cleanup(func() { deleteAllUsers(t, model.db) })
+	deleteTestUsers(t, model.db)
+	t.Cleanup(func() { deleteTestUsers(t, model.db) })
 
 	originalUser := testUsers[0]
 
 	err := model.Insert(t.Context(), &originalUser)
 	if err != nil {
-		t.Fatalf("did not expect error: %v", err)
+		t.Fatalf("Insert() error = %v; want nil", err)
 	}
 
+	duplicateIDUser := testUsers[1]
+	duplicateIDUser.ID = originalUser.ID
+
+	duplicateEmailUser := testUsers[2]
+	duplicateEmailUser.Email = originalUser.Email
+
+	duplicateDisplayNameUser := testUsers[3]
+	duplicateDisplayNameUser.DisplayName = originalUser.DisplayName
+
 	duplicateUsers := []struct {
-		duplicateField string
-		user           User
-		expectedError  error
+		name          string
+		user          User
+		expectedError error
 	}{
 		{
-			duplicateField: "ID",
-			user: User{
-				ID:          originalUser.ID,
-				Email:       testUsers[1].Email,
-				DisplayName: testUsers[1].DisplayName,
-				Status:      testUsers[1].Status,
-			},
+			name:          "Duplicate ID",
+			user:          duplicateIDUser,
 			expectedError: ErrDuplicateID,
 		},
 		{
-			duplicateField: "Email",
-			user: User{
-				ID:          testUsers[2].ID,
-				Email:       originalUser.Email,
-				DisplayName: testUsers[2].DisplayName,
-				Status:      testUsers[2].Status,
-			},
+			name:          "Duplicate email",
+			user:          duplicateEmailUser,
 			expectedError: ErrDuplicateEmail,
 		},
 		{
-			duplicateField: "Display name",
-			user: User{
-				ID:          testUsers[3].ID,
-				Email:       testUsers[3].Email,
-				DisplayName: originalUser.DisplayName,
-				Status:      testUsers[3].Status,
-			},
+			name:          "Duplicate display name",
+			user:          duplicateDisplayNameUser,
 			expectedError: ErrDuplicateDisplayName,
 		},
 	}
 
 	for _, tc := range duplicateUsers {
-		t.Run(("Duplicate " + tc.duplicateField), func(t *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
 			duplicateUser := tc.user
 			err := model.Insert(t.Context(), &duplicateUser)
 			if err == nil {
-				t.Fatal("expected error")
+				t.Fatalf("Insert() error = nil; want %v", tc.expectedError)
 			}
 
 			if !errors.Is(err, tc.expectedError) {
-				t.Fatalf("expected %q, got %q", tc.expectedError, err)
+				t.Errorf("Insert() error = %v; want %v", err, tc.expectedError)
 			}
 		})
 	}
@@ -144,14 +142,14 @@ func TestInsertDuplicatedUser(t *testing.T) {
 
 func TestGet(t *testing.T) {
 	model := getModel(t)
-	deleteAllUsers(t, model.db)
-	t.Cleanup(func() { deleteAllUsers(t, model.db) })
+	deleteTestUsers(t, model.db)
+	t.Cleanup(func() { deleteTestUsers(t, model.db) })
 
 	insertedUser := testUsers[0]
 
 	err := model.Insert(t.Context(), &insertedUser)
 	if err != nil {
-		t.Fatalf("error while inserting user: %v", err)
+		t.Fatalf("Insert() error = %v; want nil", err)
 	}
 
 	uuidTypes := []struct {
@@ -166,31 +164,31 @@ func TestGet(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			retrievedUser, err := model.Get(t.Context(), UserID(tc.id))
 			if err != nil {
-				t.Fatalf("did not expect error: %v", err)
+				t.Fatalf("Get() error = %v; want nil", err)
 			}
 
 			if retrievedUser.ID != insertedUser.ID {
-				t.Fatalf("retrieved user id expected %q, got %q", insertedUser.ID, retrievedUser.ID)
+				t.Errorf("Get() ID = %q; want %q", retrievedUser.ID, insertedUser.ID)
 			}
 
 			if retrievedUser.Email != insertedUser.Email {
-				t.Fatalf("retrieved user email expected %q, got %q", insertedUser.Email, retrievedUser.Email)
+				t.Errorf("Get() Email = %q; want %q", retrievedUser.Email, insertedUser.Email)
 			}
 
 			if retrievedUser.DisplayName != insertedUser.DisplayName {
-				t.Fatalf("retrieved user display name expected %q, got %q", insertedUser.DisplayName, retrievedUser.DisplayName)
+				t.Errorf("Get() DisplayName = %q; want %q", retrievedUser.DisplayName, insertedUser.DisplayName)
 			}
 
 			if retrievedUser.Status != insertedUser.Status {
-				t.Fatalf("retrieved user status expected %q, got %q", insertedUser.Status, retrievedUser.Status)
+				t.Errorf("Get() Status = %q; want %q", retrievedUser.Status, insertedUser.Status)
 			}
 
-			if retrievedUser.CreatedAt.IsZero() {
-				t.Fatal("retrieved user created at expected to be non-zero value")
+			if !retrievedUser.CreatedAt.Equal(insertedUser.CreatedAt) {
+				t.Errorf("Get() CreatedAt = %v; want %v", retrievedUser.CreatedAt, insertedUser.CreatedAt)
 			}
 
-			if retrievedUser.UpdatedAt.IsZero() {
-				t.Fatal("retrieved user updated at expected to be non-zero value")
+			if !retrievedUser.UpdatedAt.Equal(insertedUser.UpdatedAt) {
+				t.Errorf("Get() UpdatedAt = %v; want %v", retrievedUser.UpdatedAt, insertedUser.UpdatedAt)
 			}
 
 		})
@@ -202,26 +200,26 @@ func TestGetInvalidID(t *testing.T) {
 
 	_, err := model.Get(t.Context(), UserID(""))
 	if err == nil {
-		t.Fatal("expected error")
+		t.Fatalf("Get() error = nil; want %v", ErrInvalidID)
 	}
 
 	if !errors.Is(err, ErrInvalidID) {
-		t.Fatalf("expected %v, got %v", ErrInvalidID, err)
+		t.Errorf("Get() error = %v; want %v", err, ErrInvalidID)
 	}
 }
 
 func TestGetUserNotFound(t *testing.T) {
 	model := getModel(t)
-	deleteAllUsers(t, model.db)
-	t.Cleanup(func() { deleteAllUsers(t, model.db) })
+	deleteTestUsers(t, model.db)
+	t.Cleanup(func() { deleteTestUsers(t, model.db) })
 
 	_, err := model.Get(t.Context(), testUsers[0].ID)
 	if err == nil {
-		t.Fatal("expected error")
-	} else {
-		if !errors.Is(err, ErrRecordNotFound) {
-			t.Fatalf("expected %v, got %v", ErrRecordNotFound, err)
-		}
+		t.Fatalf("Get() error = nil; want %v", ErrRecordNotFound)
+	}
+
+	if !errors.Is(err, ErrRecordNotFound) {
+		t.Errorf("Get() error = %v; want %v", err, ErrRecordNotFound)
 	}
 }
 
@@ -246,7 +244,7 @@ func getModel(t testing.TB) *UserModel {
 	return NewUserModel(db)
 }
 
-func deleteAllUsers(t testing.TB, db *pgxpool.Pool) {
+func deleteTestUsers(t testing.TB, db *pgxpool.Pool) {
 	t.Helper()
 
 	for _, user := range testUsers {
