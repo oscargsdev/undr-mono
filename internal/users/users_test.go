@@ -11,58 +11,62 @@ import (
 	"github.com/oscargsdev/undr-mono/internal/database"
 )
 
-var (
-	ids = []string{
-		"11111111-1111-1111-1111-111111111111",
-		"22222222-2222-2222-2222-222222222222",
-		"33333333-3333-3333-3333-333333333333",
-		"44444444-4444-4444-4444-444444444444"}
+const activeStatus = "active"
 
-	mails = []string{
-		"user1@mail.com",
-	}
-
-	displayNames = []string{
-		"Display Name 1",
-	}
-)
+var testUsers = []User{
+	{
+		ID:          "11111111-1111-1111-1111-111111111111",
+		Email:       "user1@mail.com",
+		DisplayName: "Display Name 1",
+		Status:      activeStatus,
+	},
+	{
+		ID:          "22222222-2222-2222-2222-222222222222",
+		Email:       "user2@mail.com",
+		DisplayName: "Display Name 2",
+		Status:      activeStatus,
+	},
+	{
+		ID:          "33333333-3333-3333-3333-333333333333",
+		Email:       "user3@mail.com",
+		DisplayName: "Display Name 3",
+		Status:      activeStatus,
+	},
+	{
+		ID:          "44444444-4444-4444-4444-444444444444",
+		Email:       "user4@mail.com",
+		DisplayName: "Display Name 4",
+		Status:      activeStatus,
+	},
+}
 
 func TestInsert(t *testing.T) {
 	model := getModel(t)
 	deleteAllUsers(t, model.db)
 	t.Cleanup(func() { deleteAllUsers(t, model.db) })
 
-	var userID UserID = UserID(ids[0])
-	email := "user1@mail.com"
-	displayName := "User 1"
-	status := "active"
+	expectedUser := testUsers[0]
+	user := expectedUser
 
-	user := &User{
-		ID:          userID,
-		Email:       email,
-		DisplayName: displayName,
-		Status:      status,
-	}
-
-	err := model.Insert(t.Context(), user)
+	err := model.Insert(t.Context(), &user)
 	if err != nil {
 		t.Fatalf("did not expect error: %v", err)
 	}
 
-	if user.ID != userID {
-		t.Fatalf("user id expected %q, got %q", userID, user.ID)
+	if user.ID != expectedUser.ID {
+		t.Fatalf("user id expected %q, got %q", expectedUser.ID, user.ID)
 	}
 
-	if user.Email != email {
-		t.Fatalf("user email expected %q, got %q", email, user.Email)
+	if user.Email != expectedUser.Email {
+		t.Fatalf("user email expected %q, got %q", expectedUser.Email, user.Email)
 	}
 
-	if user.DisplayName != displayName {
-		t.Fatalf("user display name expected %q, got %q", displayName, user.DisplayName)
+	if user.DisplayName != expectedUser.DisplayName {
+		t.Fatalf("user display name expected %q, got %q", expectedUser.DisplayName, user.DisplayName)
 	}
 
-	if user.Status != status {
-		t.Fatalf("user status expected %q, got %q", status, user.Status)
+	if user.Status != expectedUser.Status {
+		t.Fatalf("user status expected %q, got %q", expectedUser.Status, user.Status)
 	}
 
 	if user.CreatedAt.IsZero() {
@@ -79,46 +83,54 @@ func TestInsertDuplicatedUser(t *testing.T) {
 	deleteAllUsers(t, model.db)
 	t.Cleanup(func() { deleteAllUsers(t, model.db) })
 
-	var userID UserID = UserID(ids[0])
-	email := "user1@mail.com"
-	displayName := "User 1"
-	status := "active"
+	originalUser := testUsers[0]
 
-	user := &User{
-		ID:          userID,
-		Email:       email,
-		DisplayName: displayName,
-		Status:      status,
-	}
-
-	err := model.Insert(t.Context(), user)
+	err := model.Insert(t.Context(), &originalUser)
 	if err != nil {
 		t.Fatalf("did not expect error: %v", err)
 	}
-	t.Cleanup(func() { deleteUser(t, model.db, user.ID) })
 
 	duplicateUsers := []struct {
 		duplicateField string
-		userID         UserID
-		email          string
-		displayName    string
-		status         string
+		user           User
 		expectedError  error
 	}{
-		{"ID", userID, "user2@mail.com", "User 2", status, ErrDuplicateID},
-		{"Email", UserID(ids[2]), email, "User 3", status, ErrDuplicateEmail},
-		{"Display name", UserID(ids[3]), "user4@mail.com", displayName, status, ErrDuplicateDisplayName},
+		{
+			duplicateField: "ID",
+			user: User{
+				ID:          originalUser.ID,
+				Email:       testUsers[1].Email,
+				DisplayName: testUsers[1].DisplayName,
+				Status:      testUsers[1].Status,
+			},
+			expectedError: ErrDuplicateID,
+		},
+		{
+			duplicateField: "Email",
+			user: User{
+				ID:          testUsers[2].ID,
+				Email:       originalUser.Email,
+				DisplayName: testUsers[2].DisplayName,
+				Status:      testUsers[2].Status,
+			},
+			expectedError: ErrDuplicateEmail,
+		},
+		{
+			duplicateField: "Display name",
+			user: User{
+				ID:          testUsers[3].ID,
+				Email:       testUsers[3].Email,
+				DisplayName: originalUser.DisplayName,
+				Status:      testUsers[3].Status,
+			},
+			expectedError: ErrDuplicateDisplayName,
+		},
 	}
 
 	for _, tc := range duplicateUsers {
 		t.Run(("Duplicate " + tc.duplicateField), func(t *testing.T) {
-			duplicateUser := &User{
-				ID:          tc.userID,
-				Email:       tc.email,
-				DisplayName: tc.displayName,
-				Status:      tc.status,
-			}
-			err := model.Insert(t.Context(), duplicateUser)
+			duplicateUser := tc.user
+			err := model.Insert(t.Context(), &duplicateUser)
 			if err == nil {
 				t.Fatal("expected error")
 			}
@@ -135,14 +147,9 @@ func TestGet(t *testing.T) {
 	deleteAllUsers(t, model.db)
 	t.Cleanup(func() { deleteAllUsers(t, model.db) })
 
-	insertedUser := &User{
-		ID:          UserID(ids[0]),
-		Email:       mails[0],
-		DisplayName: displayNames[0],
-		Status:      "active",
-	}
+	insertedUser := testUsers[0]
 
-	err := model.Insert(t.Context(), insertedUser)
+	err := model.Insert(t.Context(), &insertedUser)
 	if err != nil {
 		t.Fatalf("error while inserting user: %v", err)
 	}
@@ -208,7 +215,7 @@ func TestGetUserNotFound(t *testing.T) {
 	deleteAllUsers(t, model.db)
 	t.Cleanup(func() { deleteAllUsers(t, model.db) })
 
-	_, err := model.Get(t.Context(), UserID(ids[0]))
+	_, err := model.Get(t.Context(), testUsers[0].ID)
 	if err == nil {
 		t.Fatal("expected error")
 	} else {
@@ -242,8 +249,8 @@ func getModel(t testing.TB) *UserModel {
 func deleteAllUsers(t testing.TB, db *pgxpool.Pool) {
 	t.Helper()
 
-	for _, id := range ids {
-		deleteUser(t, db, UserID(id))
+	for _, user := range testUsers {
+		deleteUser(t, db, user.ID)
 	}
 }
 
