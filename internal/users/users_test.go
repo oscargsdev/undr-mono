@@ -48,37 +48,37 @@ func TestInsert(t *testing.T) {
 	expectedUser := testUsers[0]
 	user := expectedUser
 
-	err := model.Insert(t.Context(), &user)
+	insertedUser, err := model.Insert(t.Context(), &user)
 	if err != nil {
 		t.Fatalf("Insert() error = %v; want nil", err)
 	}
 
-	if user.ID != expectedUser.ID {
-		t.Errorf("Insert() ID = %q; want %q", user.ID, expectedUser.ID)
+	if insertedUser.ID != expectedUser.ID {
+		t.Errorf("Insert() ID = %q; want %q", insertedUser.ID, expectedUser.ID)
 	}
 
-	if user.Email != expectedUser.Email {
-		t.Errorf("Insert() Email = %q; want %q", user.Email, expectedUser.Email)
+	if insertedUser.Email != expectedUser.Email {
+		t.Errorf("Insert() Email = %q; want %q", insertedUser.Email, expectedUser.Email)
 	}
 
-	if user.DisplayName != expectedUser.DisplayName {
-		t.Errorf("Insert() DisplayName = %q; want %q", user.DisplayName, expectedUser.DisplayName)
+	if insertedUser.DisplayName != expectedUser.DisplayName {
+		t.Errorf("Insert() DisplayName = %q; want %q", insertedUser.DisplayName, expectedUser.DisplayName)
 	}
 
-	if user.Status != expectedUser.Status {
-		t.Errorf("Insert() Status = %q; want %q", user.Status, expectedUser.Status)
+	if insertedUser.Status != expectedUser.Status {
+		t.Errorf("Insert() Status = %q; want %q", insertedUser.Status, expectedUser.Status)
 	}
 
-	if user.CreatedAt.IsZero() {
+	if insertedUser.CreatedAt.IsZero() {
 		t.Error("Insert() CreatedAt is zero; want non-zero")
 	}
 
-	if user.UpdatedAt.IsZero() {
+	if insertedUser.UpdatedAt.IsZero() {
 		t.Error("Insert() UpdatedAt is zero; want non-zero")
 	}
 
-	if !user.CreatedAt.Equal(user.UpdatedAt) {
-		t.Errorf("Insert() CreatedAt = %v, UpdatedAt = %v; want equal timestamps", user.CreatedAt, user.UpdatedAt)
+	if !insertedUser.CreatedAt.Equal(insertedUser.UpdatedAt) {
+		t.Errorf("Insert() CreatedAt = %v, UpdatedAt = %v; want equal timestamps", insertedUser.CreatedAt, user.UpdatedAt)
 	}
 }
 
@@ -89,7 +89,7 @@ func TestInsertDuplicatedUser(t *testing.T) {
 
 	originalUser := testUsers[0]
 
-	err := model.Insert(t.Context(), &originalUser)
+	_, err := model.Insert(t.Context(), &originalUser)
 	if err != nil {
 		t.Fatalf("Insert() error = %v; want nil", err)
 	}
@@ -128,7 +128,7 @@ func TestInsertDuplicatedUser(t *testing.T) {
 	for _, tc := range duplicateUsers {
 		t.Run(tc.name, func(t *testing.T) {
 			duplicateUser := tc.user
-			err := model.Insert(t.Context(), &duplicateUser)
+			_, err := model.Insert(t.Context(), &duplicateUser)
 			if err == nil {
 				t.Fatalf("Insert() error = nil; want %v", tc.expectedError)
 			}
@@ -145,9 +145,9 @@ func TestGet(t *testing.T) {
 	deleteTestUsers(t, model.db)
 	t.Cleanup(func() { deleteTestUsers(t, model.db) })
 
-	insertedUser := testUsers[0]
+	user := testUsers[0]
 
-	err := model.Insert(t.Context(), &insertedUser)
+	insertedUser, err := model.Insert(t.Context(), &user)
 	if err != nil {
 		t.Fatalf("Insert() error = %v; want nil", err)
 	}

@@ -56,7 +56,7 @@ func NewUserModel(db *pgxpool.Pool) *UserModel {
 // Returns ErrDuplicateID if a user with the given ID already exists.
 // Returns ErrDuplicateEmail if a user with the given email address already exists.
 // Returns ErrDuplicateDisplayName if a user with the given display name already exists.
-func (m *UserModel) Insert(ctx context.Context, user *User) error {
+func (m *UserModel) Insert(ctx context.Context, user *User) (*User, error) {
 	query := `
 		INSERT INTO users(id, email, display_name, status) 
 		VALUES ($1, $2, $3, $4)
@@ -66,13 +66,15 @@ func (m *UserModel) Insert(ctx context.Context, user *User) error {
 	queryCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
 
+	insertedUser := User{}
+
 	err := m.db.QueryRow(queryCtx, query, args...).Scan(
-		&user.ID,
-		&user.Email,
-		&user.DisplayName,
-		&user.Status,
-		&user.CreatedAt,
-		&user.UpdatedAt)
+		&insertedUser.ID,
+		&insertedUser.Email,
+		&insertedUser.DisplayName,
+		&insertedUser.Status,
+		&insertedUser.CreatedAt,
+		&insertedUser.UpdatedAt)
 
 	if err != nil {
 		var pgErr *pgconn.PgError
@@ -82,21 +84,23 @@ func (m *UserModel) Insert(ctx context.Context, user *User) error {
 			case "23505":
 				switch pgErr.ConstraintName {
 				case "users_pkey":
-					return ErrDuplicateID
+					return nil, ErrDuplicateID
 				case "users_email_key":
-					return ErrDuplicateEmail
+					return nil, ErrDuplicateEmail
 				case "users_display_name_key":
-					return ErrDuplicateDisplayName
+					return nil, ErrDuplicateDisplayName
 				default:
-					return err
+					return nil, err
 				}
-
+			default:
+				return nil, err
 			}
 		default:
-			return err
+			return nil, err
 		}
 	}
-	return err
+
+	return &insertedUser, nil
 }
 
 // Get retrieves a user by ID.
