@@ -140,3 +140,27 @@ func (m *UserModel) Get(ctx context.Context, id UserID) (*User, error) {
 
 	return &user, nil
 }
+
+func (m *UserModel) Delete(ctx context.Context, id UserID) error {
+	parsedID, err := uuid.Parse(string(id))
+	if err != nil {
+		return ErrInvalidID
+	}
+
+	query := `DELETE FROM users WHERE id = $1`
+
+	queryCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+
+	_, err = m.db.Exec(queryCtx, query, parsedID)
+	if err != nil {
+		switch {
+		case errors.Is(err, pgx.ErrNoRows):
+			return ErrRecordNotFound
+		default:
+			return err
+		}
+	}
+
+	return nil
+}

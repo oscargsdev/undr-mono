@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/oscargsdev/undr-mono/internal/config"
 	"github.com/oscargsdev/undr-mono/internal/database"
 )
@@ -42,8 +41,8 @@ var testUsers = []User{
 
 func TestInsert(t *testing.T) {
 	model := getModel(t)
-	deleteTestUsers(t, model.db)
-	t.Cleanup(func() { deleteTestUsers(t, model.db) })
+	deleteTestUsers(t, model)
+	t.Cleanup(func() { deleteTestUsers(t, model) })
 
 	expectedUser := testUsers[0]
 	user := expectedUser
@@ -84,8 +83,8 @@ func TestInsert(t *testing.T) {
 
 func TestInsertDuplicatedUser(t *testing.T) {
 	model := getModel(t)
-	deleteTestUsers(t, model.db)
-	t.Cleanup(func() { deleteTestUsers(t, model.db) })
+	deleteTestUsers(t, model)
+	t.Cleanup(func() { deleteTestUsers(t, model) })
 
 	originalUser := testUsers[0]
 
@@ -142,8 +141,8 @@ func TestInsertDuplicatedUser(t *testing.T) {
 
 func TestGet(t *testing.T) {
 	model := getModel(t)
-	deleteTestUsers(t, model.db)
-	t.Cleanup(func() { deleteTestUsers(t, model.db) })
+	deleteTestUsers(t, model)
+	t.Cleanup(func() { deleteTestUsers(t, model) })
 
 	user := testUsers[0]
 
@@ -210,8 +209,8 @@ func TestGetInvalidID(t *testing.T) {
 
 func TestGetUserNotFound(t *testing.T) {
 	model := getModel(t)
-	deleteTestUsers(t, model.db)
-	t.Cleanup(func() { deleteTestUsers(t, model.db) })
+	deleteTestUsers(t, model)
+	t.Cleanup(func() { deleteTestUsers(t, model) })
 
 	_, err := model.Get(t.Context(), testUsers[0].ID)
 	if err == nil {
@@ -244,24 +243,24 @@ func getModel(t testing.TB) *UserModel {
 	return NewUserModel(db)
 }
 
-func deleteTestUsers(t testing.TB, db *pgxpool.Pool) {
+func deleteTestUsers(t testing.TB, m *UserModel) {
 	t.Helper()
 
 	for _, user := range testUsers {
-		deleteUser(t, db, user.ID)
+		m.Delete(t.Context(), user.ID)
 	}
 }
 
-func deleteUser(t testing.TB, db *pgxpool.Pool, userID UserID) {
-	t.Helper()
+// func deleteUser(t testing.TB, db *pgxpool.Pool, userID UserID) {
+// 	t.Helper()
 
-	query := `DELETE FROM users WHERE id = $1`
+// 	query := `DELETE FROM users WHERE id = $1`
 
-	queryCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
+// 	queryCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+// 	defer cancel()
 
-	_, err := db.Exec(queryCtx, query, userID)
-	if err != nil {
-		t.Fatalf("error while deleting from users: %v", err)
-	}
-}
+// 	_, err := db.Exec(queryCtx, query, userID)
+// 	if err != nil {
+// 		t.Fatalf("error while deleting from users: %v", err)
+// 	}
+// }
