@@ -1,1 +1,0 @@
-INSERT INTO projects(name) VALUES ('undersleep'), ('epifani'), ('bardo');

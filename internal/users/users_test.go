@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/oscargsdev/undr-mono/internal/config"
 	"github.com/oscargsdev/undr-mono/internal/database"
 )
@@ -41,16 +42,16 @@ var testUsers = []User{
 
 func TestInsert(t *testing.T) {
 	model := getModel(t)
-	deleteTestUsers(t, model)
-	t.Cleanup(func() { deleteTestUsers(t, model) })
 
 	expectedUser := testUsers[0]
+	expectedUser.ID = UserID(uuid.New().String())
 	user := expectedUser
 
 	insertedUser, err := model.Insert(t.Context(), &user)
 	if err != nil {
 		t.Fatalf("Insert() error = %v; want nil", err)
 	}
+	t.Cleanup(func() { model.Delete(context.Background(), insertedUser.ID) })
 
 	if insertedUser.ID != expectedUser.ID {
 		t.Errorf("Insert() ID = %q; want %q", insertedUser.ID, expectedUser.ID)
@@ -83,15 +84,15 @@ func TestInsert(t *testing.T) {
 
 func TestInsertDuplicatedUser(t *testing.T) {
 	model := getModel(t)
-	deleteTestUsers(t, model)
-	t.Cleanup(func() { deleteTestUsers(t, model) })
 
 	originalUser := testUsers[0]
+	originalUser.ID = UserID(uuid.New().String())
 
 	_, err := model.Insert(t.Context(), &originalUser)
 	if err != nil {
 		t.Fatalf("Insert() error = %v; want nil", err)
 	}
+	t.Cleanup(func() { model.Delete(context.Background(), originalUser.ID) })
 
 	duplicateIDUser := testUsers[1]
 	duplicateIDUser.ID = originalUser.ID
@@ -141,15 +142,15 @@ func TestInsertDuplicatedUser(t *testing.T) {
 
 func TestGet(t *testing.T) {
 	model := getModel(t)
-	deleteTestUsers(t, model)
-	t.Cleanup(func() { deleteTestUsers(t, model) })
 
 	user := testUsers[0]
+	user.ID = UserID(uuid.New().String())
 
 	insertedUser, err := model.Insert(t.Context(), &user)
 	if err != nil {
 		t.Fatalf("Insert() error = %v; want nil", err)
 	}
+	t.Cleanup(func() { model.Delete(context.Background(), insertedUser.ID) })
 
 	uuidTypes := []struct {
 		name string
@@ -209,10 +210,8 @@ func TestGetInvalidID(t *testing.T) {
 
 func TestGetUserNotFound(t *testing.T) {
 	model := getModel(t)
-	deleteTestUsers(t, model)
-	t.Cleanup(func() { deleteTestUsers(t, model) })
 
-	_, err := model.Get(t.Context(), testUsers[0].ID)
+	_, err := model.Get(t.Context(), UserID(uuid.New().String()))
 	if err == nil {
 		t.Fatalf("Get() error = nil; want %v", ErrRecordNotFound)
 	}
@@ -242,25 +241,3 @@ func getModel(t testing.TB) *UserModel {
 
 	return NewUserModel(db)
 }
-
-func deleteTestUsers(t testing.TB, m *UserModel) {
-	t.Helper()
-
-	for _, user := range testUsers {
-		m.Delete(t.Context(), user.ID)
-	}
-}
-
-// func deleteUser(t testing.TB, db *pgxpool.Pool, userID UserID) {
-// 	t.Helper()
-
-// 	query := `DELETE FROM users WHERE id = $1`
-
-// 	queryCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-// 	defer cancel()
-
-// 	_, err := db.Exec(queryCtx, query, userID)
-// 	if err != nil {
-// 		t.Fatalf("error while deleting from users: %v", err)
-// 	}
-// }
