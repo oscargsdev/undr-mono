@@ -13,45 +13,23 @@ import (
 
 const activeStatus = "active"
 
-var testUsers = []User{
-	{
-		ID:          "11111111-1111-1111-1111-111111111111",
-		Email:       "user1@mail.com",
-		DisplayName: "Display Name 1",
-		Status:      activeStatus,
-	},
-	{
-		ID:          "22222222-2222-2222-2222-222222222222",
-		Email:       "user2@mail.com",
-		DisplayName: "Display Name 2",
-		Status:      activeStatus,
-	},
-	{
-		ID:          "33333333-3333-3333-3333-333333333333",
-		Email:       "user3@mail.com",
-		DisplayName: "Display Name 3",
-		Status:      activeStatus,
-	},
-	{
-		ID:          "44444444-4444-4444-4444-444444444444",
-		Email:       "user4@mail.com",
-		DisplayName: "Display Name 4",
-		Status:      activeStatus,
-	},
-}
-
 func TestInsert(t *testing.T) {
 	model := getModel(t)
+	testUsers := generateUserFixtures(t, 1)
 
 	expectedUser := testUsers[0]
-	expectedUser.ID = UserID(uuid.New().String())
 	user := expectedUser
 
 	insertedUser, err := model.Insert(t.Context(), &user)
 	if err != nil {
 		t.Fatalf("Insert() error = %v; want nil", err)
 	}
-	t.Cleanup(func() { model.Delete(context.Background(), insertedUser.ID) })
+	t.Cleanup(func() {
+		err := model.Delete(context.Background(), insertedUser.ID)
+		if err != nil {
+			t.Errorf("error while deleting test users: %v", err)
+		}
+	})
 
 	if insertedUser.ID != expectedUser.ID {
 		t.Errorf("Insert() ID = %q; want %q", insertedUser.ID, expectedUser.ID)
@@ -84,15 +62,20 @@ func TestInsert(t *testing.T) {
 
 func TestInsertDuplicatedUser(t *testing.T) {
 	model := getModel(t)
+	testUsers := generateUserFixtures(t, 4)
 
 	originalUser := testUsers[0]
-	originalUser.ID = UserID(uuid.New().String())
 
 	_, err := model.Insert(t.Context(), &originalUser)
 	if err != nil {
 		t.Fatalf("Insert() error = %v; want nil", err)
 	}
-	t.Cleanup(func() { model.Delete(context.Background(), originalUser.ID) })
+	t.Cleanup(func() {
+		err := model.Delete(context.Background(), originalUser.ID)
+		if err != nil {
+			t.Errorf("error while deleting test users: %v", err)
+		}
+	})
 
 	duplicateIDUser := testUsers[1]
 	duplicateIDUser.ID = originalUser.ID
@@ -142,15 +125,20 @@ func TestInsertDuplicatedUser(t *testing.T) {
 
 func TestGet(t *testing.T) {
 	model := getModel(t)
+	testUsers := generateUserFixtures(t, 1)
 
 	user := testUsers[0]
-	user.ID = UserID(uuid.New().String())
 
 	insertedUser, err := model.Insert(t.Context(), &user)
 	if err != nil {
 		t.Fatalf("Insert() error = %v; want nil", err)
 	}
-	t.Cleanup(func() { model.Delete(context.Background(), insertedUser.ID) })
+	t.Cleanup(func() {
+		err := model.Delete(context.Background(), insertedUser.ID)
+		if err != nil {
+			t.Errorf("error while deleting test users: %v", err)
+		}
+	})
 
 	uuidTypes := []struct {
 		name string
@@ -211,7 +199,7 @@ func TestGetInvalidID(t *testing.T) {
 func TestGetUserNotFound(t *testing.T) {
 	model := getModel(t)
 
-	_, err := model.Get(t.Context(), UserID(uuid.New().String()))
+	_, err := model.Get(t.Context(), UserID(uuid.NewString()))
 	if err == nil {
 		t.Fatalf("Get() error = nil; want %v", ErrRecordNotFound)
 	}
@@ -240,4 +228,27 @@ func getModel(t testing.TB) *UserModel {
 	t.Cleanup(db.Close)
 
 	return NewUserModel(db)
+}
+
+func generateUserFixtures(t testing.TB, n int) []User {
+	t.Helper()
+
+	testUsers := make([]User, 0, n)
+
+	for range n {
+		id := UserID(uuid.NewString())
+		email := "user" + string(id) + "@mail.com"
+		displayName := "User " + string(id)
+
+		user := User{
+			ID:          id,
+			Email:       email,
+			DisplayName: displayName,
+			Status:      activeStatus,
+		}
+
+		testUsers = append(testUsers, user)
+	}
+
+	return testUsers
 }

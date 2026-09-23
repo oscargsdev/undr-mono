@@ -13,36 +13,9 @@ import (
 	"github.com/oscargsdev/undr-mono/internal/users"
 )
 
-var testUsers = []users.User{
-	{
-		ID:          "11111111-1111-1111-1111-111111111111",
-		Email:       "user1@mail.com",
-		DisplayName: "Display Name 1",
-		Status:      "active",
-	},
-	{
-		ID:          "22222222-2222-2222-2222-222222222222",
-		Email:       "user2@mail.com",
-		DisplayName: "Display Name 2",
-		Status:      "active",
-	},
-	{
-		ID:          "33333333-3333-3333-3333-333333333333",
-		Email:       "user3@mail.com",
-		DisplayName: "Display Name 3",
-		Status:      "active",
-	},
-	{
-		ID:          "44444444-4444-4444-4444-444444444444",
-		Email:       "user4@mail.com",
-		DisplayName: "Display Name 4",
-		Status:      "active",
-	},
-}
-
 func TestGetProject(t *testing.T) {
 	projectModel, userModel := getModels(t)
-	insertTestUsers(t, userModel, testUsers)
+	testUsers := insertTestUsers(t, userModel, 3)
 
 	testsProjects := []struct {
 		name    string
@@ -57,19 +30,24 @@ func TestGetProject(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			insertedProject, err := projectModel.Insert(t.Context(), &tc.project)
 			if err != nil {
-				t.Fatalf("error while inserting project: %v", err)
+				t.Fatalf("Insert() error = %v; want nil", err)
 			}
 
 			retrievedProject, err := projectModel.Get(t.Context(), insertedProject.ID)
 			if err != nil {
-				t.Fatalf("failed to get project %v: %v", insertedProject.ID, err)
+				t.Fatalf("Get() error = %v; want nil", err)
 			}
 
 			if retrievedProject.ID != insertedProject.ID {
-				t.Fatalf("expected project id %d, got %d", insertedProject.ID, retrievedProject.ID)
+				t.Errorf("Get() ID = %d; want %d", retrievedProject.ID, insertedProject.ID)
 			}
+
+			if retrievedProject.OwnerID != insertedProject.OwnerID {
+				t.Errorf("Get() OwnerID = %q; want %q", retrievedProject.OwnerID, insertedProject.OwnerID)
+			}
+
 			if retrievedProject.Name != insertedProject.Name {
-				t.Fatalf("expected project name: %q, got: %q", insertedProject.Name, retrievedProject.Name)
+				t.Errorf("Get() Name = %q; want %q", retrievedProject.Name, insertedProject.Name)
 			}
 		})
 	}
@@ -81,33 +59,33 @@ func TestGetProjectIDBelowOne(t *testing.T) {
 	t.Run("ID below 1", func(t *testing.T) {
 		_, err := projectModel.Get(t.Context(), 0)
 		if err == nil {
-			t.Fatal("expected error")
+			t.Fatalf("Get() error = nil; want %v", ErrRecordNotFound)
 		}
 
 		if !errors.Is(err, ErrRecordNotFound) {
-			t.Fatalf("expected %v, got %v", ErrRecordNotFound, err)
+			t.Errorf("Get() error = %v; want %v", err, ErrRecordNotFound)
 		}
 	})
 }
 
 func TestGetProjectNonExistent(t *testing.T) {
 	projectModel, userModel := getModels(t)
-	insertTestUsers(t, userModel, testUsers)
+	testUsers := insertTestUsers(t, userModel, 1)
 
 	insertedProject, err := projectModel.Insert(t.Context(), &Project{OwnerID: testUsers[0].ID, Name: "test_project_1"})
 	if err != nil {
-		t.Fatalf("error while inserting project: %v", err)
+		t.Fatalf("Insert() error = %v; want nil", err)
 	}
 	deleteProject(t, projectModel.db, insertedProject.ID)
 
 	t.Run("ID not present", func(t *testing.T) {
 		_, err := projectModel.Get(t.Context(), insertedProject.ID)
 		if err == nil {
-			t.Fatal("expected error")
+			t.Fatalf("Get() error = nil; want %v", ErrRecordNotFound)
 		}
 
 		if !errors.Is(err, ErrRecordNotFound) {
-			t.Fatalf("expected %v, got %v", ErrRecordNotFound, err)
+			t.Errorf("Get() error = %v; want %v", err, ErrRecordNotFound)
 		}
 	})
 
@@ -148,20 +126,40 @@ func deleteProject(t testing.TB, db *pgxpool.Pool, projectID int64) {
 	}
 }
 
-func insertTestUsers(t testing.TB, m *users.UserModel, testUsers []users.User) {
+func insertTestUsers(t testing.TB, m *users.UserModel, n int) []users.User {
 	t.Helper()
 
-	for i, user := range testUsers {
-		user.ID = users.UserID(uuid.New().String())
-		user.Email = "user" + string(user.ID) + "@mail.com"
-		user.DisplayName = "User " + string(user.ID)
-		testUsers[i] = user
-		m.Insert(t.Context(), &testUsers[i])
+	insertedUsers := make([]users.User, 0, n)
+
+	for range n {
+		id := users.UserID(uuid.NewString())
+		email := "user" + string(id) + "@mail.com"
+		displayName := "User " + string(id)
+
+		user := users.User{
+			ID:          id,
+			Email:       email,
+			DisplayName: displayName,
+			Status:      "active",
+		}
+
+		insertedUser, err := m.Insert(t.Context(), &user)
+		if err != nil {
+			t.Fatalf("error while inserting test users: %v", err)
+		}
+
+		t.Cleanup(func() { deleteTestUser(t, m, insertedUser) })
+		insertedUsers = append(insertedUsers, *insertedUser)
 	}
 
-	t.Cleanup(func() {
-		for _, user := range testUsers {
-			m.Delete(context.Background(), user.ID)
-		}
-	})
+	return insertedUsers
+}
+
+func deleteTestUser(t testing.TB, m *users.UserModel, user *users.User) {
+	t.Helper()
+
+	err := m.Delete(context.Background(), user.ID)
+	if err != nil {
+		t.Errorf("error while deleting test users: %v", err)
+	}
 }
