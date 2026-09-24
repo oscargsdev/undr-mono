@@ -141,6 +141,9 @@ func (m *UserModel) Get(ctx context.Context, id UserID) (*User, error) {
 	return &user, nil
 }
 
+// Delete removes the user with the given ID.
+// Returns ErrInvalidID if the given ID is invalid or malformed.
+// Deleting a user that does not exist succeeds.
 func (m *UserModel) Delete(ctx context.Context, id UserID) error {
 	parsedID, err := uuid.Parse(string(id))
 	if err != nil {
@@ -153,14 +156,5 @@ func (m *UserModel) Delete(ctx context.Context, id UserID) error {
 	defer cancel()
 
 	_, err = m.db.Exec(queryCtx, query, parsedID)
-	if err != nil {
-		switch {
-		case errors.Is(err, pgx.ErrNoRows):
-			return ErrRecordNotFound
-		default:
-			return err
-		}
-	}
-
-	return nil
+	return err
 }

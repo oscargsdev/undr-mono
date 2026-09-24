@@ -209,6 +209,38 @@ func TestGetUserNotFound(t *testing.T) {
 	}
 }
 
+func TestDelete(t *testing.T) {
+	model := getModel(t)
+	testUsers := generateUserFixtures(t, 1)
+
+	user := testUsers[0]
+
+	insertedUser, err := model.Insert(t.Context(), &user)
+	if err != nil {
+		t.Fatalf("Insert() error = %v; want nil", err)
+	}
+	t.Cleanup(func() {
+		err := model.Delete(context.Background(), insertedUser.ID)
+		if err != nil {
+			t.Errorf("Delete() error = %v; want nil", err)
+		}
+	})
+
+	err = model.Delete(t.Context(), insertedUser.ID)
+	if err != nil {
+		t.Fatalf("Delete() error = %v; want nil", err)
+	}
+
+	_, err = model.Get(t.Context(), insertedUser.ID)
+	if err == nil {
+		t.Fatalf("Get() error = nil; want %v", ErrRecordNotFound)
+	}
+
+	if !errors.Is(err, ErrRecordNotFound) {
+		t.Errorf("Get() error = %v; want %v", err, ErrRecordNotFound)
+	}
+}
+
 func getModel(t testing.TB) *UserModel {
 	t.Helper()
 
