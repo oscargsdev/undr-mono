@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/oscargsdev/undr-mono/internal/users"
 )
@@ -13,13 +14,19 @@ import (
 var (
 	// ErrRecordNotFound indicates that a requested record does not exist.
 	ErrRecordNotFound = errors.New("record not found")
+
+	// ErrDuplicateHandle indicates that a Project with the given handle already exists.
+	ErrDuplicateHandle = errors.New("duplicate handle")
 )
 
 // Project represents a musical project.
 type Project struct {
-	ID      int64        `json:"id"`
-	OwnerID users.UserID `json:"owner_id"`
-	Name    string       `json:"name"`
+	ID        int64        `json:"id"`
+	OwnerID   users.UserID `json:"owner_id"`
+	Handle    string       `json:"handle"`
+	Name      string       `json:"name"`
+	CreatedAt time.Time    `json:"-"`
+	UpdatedAt time.Time    `json:"-"`
 }
 
 // ProjectModel provides database operations for projects.
@@ -32,9 +39,15 @@ func NewProjectModel(db *pgxpool.Pool) *ProjectModel {
 	return &ProjectModel{db: db}
 }
 
+// Insert adds a project to the db.
+// Returns ErrDuplicateHandle if a project with the given handle already exists.
 func (m *ProjectModel) Insert(ctx context.Context, project *Project) (*Project, error) {
-	query := `INSERT INTO projects (OWNER_ID, NAME) VALUES ($1, $2) RETURNING ID, OWNER_ID, NAME`
-	args := []any{&project.OwnerID, &project.Name}
+	query := `
+		INSERT INTO projects (owner_id, handle, name)
+		VALUES ($1, $2, $3)
+		RETURNING id, owner_id, handle, name, created_at, updated_at`
+
+	args := []any{project.OwnerID, project.Handle, project.Name}
 
 	insertedProject := &Project{}
 
@@ -44,11 +57,30 @@ func (m *ProjectModel) Insert(ctx context.Context, project *Project) (*Project, 
 	err := m.db.QueryRow(queryContext, query, args...).Scan(
 		&insertedProject.ID,
 		&insertedProject.OwnerID,
-		&insertedProject.Name)
+		&insertedProject.Handle,
+		&insertedProject.Name,
+		&insertedProject.CreatedAt,
+		&insertedProject.UpdatedAt,
+	)
 
 	if err != nil {
-		// TODO: Handle pgx error on constraints
-		return nil, err
+		var pgErr *pgconn.PgError
+		switch {
+		case errors.As(err, &pgErr):
+			switch pgErr.Code {
+			case "23505":
+				switch pgErr.ConstraintName {
+				case "projects_handle_key":
+					return nil, ErrDuplicateHandle
+				default:
+					return nil, err
+				}
+			default:
+				return nil, err
+			}
+		default:
+			return nil, err
+		}
 	}
 
 	return insertedProject, nil
@@ -62,7 +94,7 @@ func (m *ProjectModel) Get(ctx context.Context, id int64) (*Project, error) {
 	}
 
 	query := `
-		SELECT id, owner_id, name
+		SELECT id, owner_id, handle, name, created_at, updated_at
 		FROM projects
 		WHERE id = $1`
 
@@ -74,7 +106,10 @@ func (m *ProjectModel) Get(ctx context.Context, id int64) (*Project, error) {
 	err := m.db.QueryRow(queryCtx, query, id).Scan(
 		&project.ID,
 		&project.OwnerID,
+		&project.Handle,
 		&project.Name,
+		&project.CreatedAt,
+		&project.UpdatedAt,
 	)
 
 	if err != nil {

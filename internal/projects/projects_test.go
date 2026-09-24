@@ -13,6 +13,108 @@ import (
 	"github.com/oscargsdev/undr-mono/internal/users"
 )
 
+func TestInsert(t *testing.T) {
+	projectModel, userModel := getModels(t)
+	testUsers := insertTestUsers(t, userModel, 3)
+
+	testsProjects := []struct {
+		name    string
+		project Project
+	}{
+		{"insert test_project_1",
+			Project{
+				OwnerID: testUsers[0].ID,
+				Handle:  "project1",
+				Name:    "test_project_1",
+			}},
+		{"insert test_project_2",
+			Project{
+				OwnerID: testUsers[1].ID,
+				Handle:  "project2",
+				Name:    "test_project_2",
+			}},
+		{"insert test_project_3",
+			Project{
+				OwnerID: testUsers[2].ID,
+				Handle:  "project3",
+				Name:    "test_project_3",
+			}},
+	}
+
+	for _, tc := range testsProjects {
+		t.Run(tc.name, func(t *testing.T) {
+			newProject := tc.project
+			insertedProject, err := projectModel.Insert(t.Context(), &newProject)
+			if err != nil {
+				t.Fatalf("Insert() error = %v; want nil", err)
+			}
+
+			if insertedProject.ID == 0 {
+				t.Errorf("Insert() ID is zero; want non-zero value")
+			}
+
+			if insertedProject.OwnerID != newProject.OwnerID {
+				t.Errorf("Insert() OwnerID = %q; want %q", insertedProject.OwnerID, newProject.OwnerID)
+			}
+
+			if insertedProject.Handle != newProject.Handle {
+				t.Errorf("Insert() Handle = %q; want %q", insertedProject.Handle, newProject.Handle)
+			}
+
+			if insertedProject.Name != newProject.Name {
+				t.Errorf("Insert() Name = %q; want %q", insertedProject.Name, newProject.Name)
+			}
+
+			if insertedProject.CreatedAt.IsZero() {
+				t.Errorf("Insert() CreatedAt is zero; want non-zero")
+			}
+
+			if insertedProject.UpdatedAt.IsZero() {
+				t.Errorf("Insert() UpdatedAt is zero; want non-zero")
+			}
+
+			if !insertedProject.CreatedAt.Equal(insertedProject.UpdatedAt) {
+				t.Errorf("Insert() CreatedAt = %v, UpdatedAt = %v; want equal timestamps", insertedProject.CreatedAt, insertedProject.UpdatedAt)
+			}
+		})
+	}
+}
+
+func TestInsertDuplicates(t *testing.T) {
+	projectModel, userModel := getModels(t)
+	testUsers := insertTestUsers(t, userModel, 2)
+
+	originalHandle := "project1"
+	originalName := "Project 1"
+
+	originalProject := &Project{
+		OwnerID: testUsers[0].ID,
+		Handle:  originalHandle,
+		Name:    originalName,
+	}
+
+	_, err := projectModel.Insert(t.Context(), originalProject)
+	if err != nil {
+		t.Fatalf("Insert() error = %v; want nil", err)
+	}
+
+	duplicateHandleProject := &Project{
+		OwnerID: testUsers[1].ID,
+		Handle:  originalHandle,
+		Name:    originalName, // Projects can have the same name, Handle and ID is what differentiates them
+	}
+
+	_, err = projectModel.Insert(t.Context(), duplicateHandleProject)
+	if err == nil {
+		t.Fatalf("Insert() error = nil; want %v", ErrDuplicateHandle)
+	}
+
+	if !errors.Is(err, ErrDuplicateHandle) {
+		t.Errorf("Insert() error = %v; want %v", err, ErrDuplicateHandle)
+	}
+
+}
+
 func TestGetProject(t *testing.T) {
 	projectModel, userModel := getModels(t)
 	testUsers := insertTestUsers(t, userModel, 3)
@@ -21,9 +123,24 @@ func TestGetProject(t *testing.T) {
 		name    string
 		project Project
 	}{
-		{"get test_project_1", Project{OwnerID: testUsers[0].ID, Name: "test_project_1"}},
-		{"get test_project_2", Project{OwnerID: testUsers[1].ID, Name: "test_project_2"}},
-		{"get test_project_3", Project{OwnerID: testUsers[2].ID, Name: "test_project_3"}},
+		{"get test_project_1",
+			Project{
+				OwnerID: testUsers[0].ID,
+				Handle:  "project1",
+				Name:    "test_project_1",
+			}},
+		{"get test_project_2",
+			Project{
+				OwnerID: testUsers[1].ID,
+				Handle:  "project2",
+				Name:    "test_project_2",
+			}},
+		{"get test_project_3",
+			Project{
+				OwnerID: testUsers[2].ID,
+				Handle:  "project3",
+				Name:    "test_project_3",
+			}},
 	}
 
 	for _, tc := range testsProjects {
@@ -46,8 +163,20 @@ func TestGetProject(t *testing.T) {
 				t.Errorf("Get() OwnerID = %q; want %q", retrievedProject.OwnerID, insertedProject.OwnerID)
 			}
 
+			if retrievedProject.Handle != insertedProject.Handle {
+				t.Errorf("Get() Handle = %q; want %q", retrievedProject.Handle, insertedProject.Handle)
+			}
+
 			if retrievedProject.Name != insertedProject.Name {
 				t.Errorf("Get() Name = %q; want %q", retrievedProject.Name, insertedProject.Name)
+			}
+
+			if !retrievedProject.CreatedAt.Equal(insertedProject.CreatedAt) {
+				t.Errorf("Get() CreatedAt = %v; want %v", retrievedProject.CreatedAt, insertedProject.CreatedAt)
+			}
+
+			if !retrievedProject.UpdatedAt.Equal(insertedProject.UpdatedAt) {
+				t.Errorf("Get() UpdatedAt = %v; want %v", retrievedProject.UpdatedAt, insertedProject.UpdatedAt)
 			}
 		})
 	}
