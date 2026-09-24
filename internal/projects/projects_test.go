@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/oscargsdev/undr-mono/internal/config"
 	"github.com/oscargsdev/undr-mono/internal/database"
 	"github.com/oscargsdev/undr-mono/internal/users"
@@ -51,6 +50,12 @@ func TestInsert(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Insert() error = %v; want nil", err)
 			}
+			t.Cleanup(func() {
+				err := projectModel.Delete(context.Background(), insertedProject.ID)
+				if err != nil {
+					t.Errorf("Delete() error = %v; want nil", err)
+				}
+			})
 
 			if insertedProject.ID == 0 {
 				t.Errorf("Insert() ID is zero; want non-zero value")
@@ -101,10 +106,16 @@ func TestInsertDuplicates(t *testing.T) {
 		Status:  StatusActive,
 	}
 
-	_, err := projectModel.Insert(t.Context(), originalProject)
+	insertedProject, err := projectModel.Insert(t.Context(), originalProject)
 	if err != nil {
 		t.Fatalf("Insert() error = %v; want nil", err)
 	}
+	t.Cleanup(func() {
+		err := projectModel.Delete(context.Background(), insertedProject.ID)
+		if err != nil {
+			t.Errorf("Delete() error = %v; want nil", err)
+		}
+	})
 
 	duplicateHandleProject := &Project{
 		OwnerID: testUsers[1].ID,
@@ -182,6 +193,12 @@ func TestGetProject(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Insert() error = %v; want nil", err)
 			}
+			t.Cleanup(func() {
+				err := projectModel.Delete(context.Background(), insertedProject.ID)
+				if err != nil {
+					t.Errorf("Delete() error = %v; want nil", err)
+				}
+			})
 
 			retrievedProject, err := projectModel.Get(t.Context(), insertedProject.ID)
 			if err != nil {
@@ -248,7 +265,11 @@ func TestGetProjectNonExistent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Insert() error = %v; want nil", err)
 	}
-	deleteProject(t, projectModel.db, insertedProject.ID)
+
+	err = projectModel.Delete(t.Context(), insertedProject.ID)
+	if err != nil {
+		t.Fatalf("Delete() error = %v; want nil", err)
+	}
 
 	t.Run("ID not present", func(t *testing.T) {
 		_, err := projectModel.Get(t.Context(), insertedProject.ID)
@@ -261,6 +282,55 @@ func TestGetProjectNonExistent(t *testing.T) {
 		}
 	})
 
+}
+
+func TestDelete(t *testing.T) {
+	projectModel, userModel := getModels(t)
+	testUsers := insertTestUsers(t, userModel, 1)
+
+	project := &Project{
+		OwnerID: testUsers[0].ID,
+		Name:    "test_project_1",
+		Status:  StatusActive,
+	}
+
+	insertedProject, err := projectModel.Insert(t.Context(), project)
+	if err != nil {
+		t.Fatalf("Insert() error = %v; want nil", err)
+	}
+	t.Cleanup(func() {
+		err := projectModel.Delete(context.Background(), insertedProject.ID)
+		if err != nil {
+			t.Errorf("Delete() error = %v; want nil", err)
+		}
+	})
+
+	err = projectModel.Delete(t.Context(), insertedProject.ID)
+	if err != nil {
+		t.Fatalf("Delete() error = %v; want nil", err)
+	}
+
+	_, err = projectModel.Get(t.Context(), insertedProject.ID)
+	if err == nil {
+		t.Fatalf("Get() error = nil; want %v", ErrRecordNotFound)
+	}
+
+	if !errors.Is(err, ErrRecordNotFound) {
+		t.Errorf("Get() error = %v; want %v", err, ErrRecordNotFound)
+	}
+}
+
+func TestDeleteIDBelowOne(t *testing.T) {
+	projectModel := NewProjectModel(nil)
+
+	err := projectModel.Delete(t.Context(), 0)
+	if err == nil {
+		t.Fatalf("Delete() error = nil; want %v", ErrRecordNotFound)
+	}
+
+	if !errors.Is(err, ErrRecordNotFound) {
+		t.Errorf("Delete() error = %v; want %v", err, ErrRecordNotFound)
+	}
 }
 
 func getModels(t testing.TB) (*ProjectModel, *users.UserModel) {
@@ -282,20 +352,6 @@ func getModels(t testing.TB) (*ProjectModel, *users.UserModel) {
 	t.Cleanup(db.Close)
 
 	return NewProjectModel(db), users.NewUserModel(db)
-}
-
-func deleteProject(t testing.TB, db *pgxpool.Pool, projectID int64) {
-	t.Helper()
-
-	query := `DELETE FROM projects WHERE id = $1`
-
-	queryCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-
-	_, err := db.Exec(queryCtx, query, projectID)
-	if err != nil {
-		t.Fatalf("error while deleting from projects: %v", err)
-	}
 }
 
 func insertTestUsers(t testing.TB, m *users.UserModel, n int) []users.User {

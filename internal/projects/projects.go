@@ -145,3 +145,20 @@ func (m *ProjectModel) Get(ctx context.Context, id int64) (*Project, error) {
 
 	return &project, nil
 }
+
+// Delete removes the project with the given ID.
+// Returns ErrRecordNotFound if ID is less than 1.
+// Deleting a project that does not exist succeeds.
+func (m *ProjectModel) Delete(ctx context.Context, id int64) error {
+	if id < 1 {
+		return ErrRecordNotFound
+	}
+
+	query := `DELETE FROM projects WHERE id = $1`
+
+	queryCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+
+	_, err := m.db.Exec(queryCtx, query, id)
+	return err
+}
