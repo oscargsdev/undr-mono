@@ -26,18 +26,21 @@ func TestInsert(t *testing.T) {
 				OwnerID: testUsers[0].ID,
 				Handle:  "project1",
 				Name:    "test_project_1",
+				Status:  StatusActive,
 			}},
 		{"insert test_project_2",
 			Project{
 				OwnerID: testUsers[1].ID,
 				Handle:  "project2",
 				Name:    "test_project_2",
+				Status:  StatusLimbo,
 			}},
 		{"insert test_project_3",
 			Project{
 				OwnerID: testUsers[2].ID,
 				Handle:  "project3",
 				Name:    "test_project_3",
+				Status:  StatusActive,
 			}},
 	}
 
@@ -63,6 +66,10 @@ func TestInsert(t *testing.T) {
 
 			if insertedProject.Name != newProject.Name {
 				t.Errorf("Insert() Name = %q; want %q", insertedProject.Name, newProject.Name)
+			}
+
+			if insertedProject.Status != newProject.Status {
+				t.Errorf("Insert() Status = %q; want %q", insertedProject.Status, newProject.Status)
 			}
 
 			if insertedProject.CreatedAt.IsZero() {
@@ -91,6 +98,7 @@ func TestInsertDuplicates(t *testing.T) {
 		OwnerID: testUsers[0].ID,
 		Handle:  originalHandle,
 		Name:    originalName,
+		Status:  StatusActive,
 	}
 
 	_, err := projectModel.Insert(t.Context(), originalProject)
@@ -102,6 +110,7 @@ func TestInsertDuplicates(t *testing.T) {
 		OwnerID: testUsers[1].ID,
 		Handle:  originalHandle,
 		Name:    originalName, // Projects can have the same name, Handle and ID is what differentiates them
+		Status:  StatusActive,
 	}
 
 	_, err = projectModel.Insert(t.Context(), duplicateHandleProject)
@@ -113,6 +122,27 @@ func TestInsertDuplicates(t *testing.T) {
 		t.Errorf("Insert() error = %v; want %v", err, ErrDuplicateHandle)
 	}
 
+}
+
+func TestInsertInvalidStatus(t *testing.T) {
+	projectModel, userModel := getModels(t)
+	testUsers := insertTestUsers(t, userModel, 1)
+
+	invalidStatusProject := &Project{
+		OwnerID: testUsers[0].ID,
+		Handle:  "project1",
+		Name:    "Project 1",
+		Status:  "invalid",
+	}
+
+	_, err := projectModel.Insert(t.Context(), invalidStatusProject)
+	if err == nil {
+		t.Fatalf("Insert() error = nil; want %v", ErrInvalidStatus)
+	}
+
+	if !errors.Is(err, ErrInvalidStatus) {
+		t.Errorf("Insert() error = %v; want %v", err, ErrInvalidStatus)
+	}
 }
 
 func TestGetProject(t *testing.T) {
@@ -128,18 +158,21 @@ func TestGetProject(t *testing.T) {
 				OwnerID: testUsers[0].ID,
 				Handle:  "project1",
 				Name:    "test_project_1",
+				Status:  StatusActive,
 			}},
 		{"get test_project_2",
 			Project{
 				OwnerID: testUsers[1].ID,
 				Handle:  "project2",
 				Name:    "test_project_2",
+				Status:  StatusInactive,
 			}},
 		{"get test_project_3",
 			Project{
 				OwnerID: testUsers[2].ID,
 				Handle:  "project3",
 				Name:    "test_project_3",
+				Status:  StatusInactive,
 			}},
 	}
 
@@ -169,6 +202,10 @@ func TestGetProject(t *testing.T) {
 
 			if retrievedProject.Name != insertedProject.Name {
 				t.Errorf("Get() Name = %q; want %q", retrievedProject.Name, insertedProject.Name)
+			}
+
+			if retrievedProject.Status != insertedProject.Status {
+				t.Errorf("Get() Status = %q; want %q", retrievedProject.Status, insertedProject.Status)
 			}
 
 			if !retrievedProject.CreatedAt.Equal(insertedProject.CreatedAt) {
@@ -201,7 +238,13 @@ func TestGetProjectNonExistent(t *testing.T) {
 	projectModel, userModel := getModels(t)
 	testUsers := insertTestUsers(t, userModel, 1)
 
-	insertedProject, err := projectModel.Insert(t.Context(), &Project{OwnerID: testUsers[0].ID, Name: "test_project_1"})
+	project := &Project{
+		OwnerID: testUsers[0].ID,
+		Name:    "test_project_1",
+		Status:  StatusActive,
+	}
+
+	insertedProject, err := projectModel.Insert(t.Context(), project)
 	if err != nil {
 		t.Fatalf("Insert() error = %v; want nil", err)
 	}

@@ -17,6 +17,18 @@ var (
 
 	// ErrDuplicateHandle indicates that a Project with the given handle already exists.
 	ErrDuplicateHandle = errors.New("duplicate handle")
+
+	// ErrInvalidStatus indicates that a Project has an invalid status.
+	ErrInvalidStatus = errors.New("invalid status")
+)
+
+const (
+	// StatusActive indicates an active project.
+	StatusActive = "active"
+	// StatusLimbo indicates a project in limbo (we don't know if it's active or inactive; it may be in pause, indefinite hiatus, etc).
+	StatusLimbo = "limbo"
+	// StatusInactive indicates an inactive project.
+	StatusInactive = "inactive"
 )
 
 // Project represents a musical project.
@@ -25,6 +37,7 @@ type Project struct {
 	OwnerID   users.UserID `json:"owner_id"`
 	Handle    string       `json:"handle"`
 	Name      string       `json:"name"`
+	Status    string       `json:"status"`
 	CreatedAt time.Time    `json:"-"`
 	UpdatedAt time.Time    `json:"-"`
 }
@@ -43,11 +56,11 @@ func NewProjectModel(db *pgxpool.Pool) *ProjectModel {
 // Returns ErrDuplicateHandle if a project with the given handle already exists.
 func (m *ProjectModel) Insert(ctx context.Context, project *Project) (*Project, error) {
 	query := `
-		INSERT INTO projects (owner_id, handle, name)
-		VALUES ($1, $2, $3)
-		RETURNING id, owner_id, handle, name, created_at, updated_at`
+		INSERT INTO projects (owner_id, handle, name, status)
+		VALUES ($1, $2, $3, $4)
+		RETURNING id, owner_id, handle, name, status, created_at, updated_at`
 
-	args := []any{project.OwnerID, project.Handle, project.Name}
+	args := []any{project.OwnerID, project.Handle, project.Name, project.Status}
 
 	insertedProject := &Project{}
 
@@ -59,6 +72,7 @@ func (m *ProjectModel) Insert(ctx context.Context, project *Project) (*Project, 
 		&insertedProject.OwnerID,
 		&insertedProject.Handle,
 		&insertedProject.Name,
+		&insertedProject.Status,
 		&insertedProject.CreatedAt,
 		&insertedProject.UpdatedAt,
 	)
@@ -72,6 +86,13 @@ func (m *ProjectModel) Insert(ctx context.Context, project *Project) (*Project, 
 				switch pgErr.ConstraintName {
 				case "projects_handle_key":
 					return nil, ErrDuplicateHandle
+				default:
+					return nil, err
+				}
+			case "23514":
+				switch pgErr.ConstraintName {
+				case "project_status_check":
+					return nil, ErrInvalidStatus
 				default:
 					return nil, err
 				}
@@ -94,7 +115,7 @@ func (m *ProjectModel) Get(ctx context.Context, id int64) (*Project, error) {
 	}
 
 	query := `
-		SELECT id, owner_id, handle, name, created_at, updated_at
+		SELECT id, owner_id, handle, name, status, created_at, updated_at
 		FROM projects
 		WHERE id = $1`
 
@@ -108,6 +129,7 @@ func (m *ProjectModel) Get(ctx context.Context, id int64) (*Project, error) {
 		&project.OwnerID,
 		&project.Handle,
 		&project.Name,
+		&project.Status,
 		&project.CreatedAt,
 		&project.UpdatedAt,
 	)
