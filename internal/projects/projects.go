@@ -54,6 +54,7 @@ func NewProjectModel(db *pgxpool.Pool) *ProjectModel {
 
 // Insert adds a project to the db.
 // Returns ErrDuplicateHandle if a project with the given handle already exists.
+// Returns ErrInvalidStatus if the project has an invalid status.
 func (m *ProjectModel) Insert(ctx context.Context, project *Project) (*Project, error) {
 	query := `
 		INSERT INTO projects (owner_id, handle, name, status)
@@ -78,37 +79,14 @@ func (m *ProjectModel) Insert(ctx context.Context, project *Project) (*Project, 
 	)
 
 	if err != nil {
-		var pgErr *pgconn.PgError
-		switch {
-		case errors.As(err, &pgErr):
-			switch pgErr.Code {
-			case "23505":
-				switch pgErr.ConstraintName {
-				case "projects_handle_key":
-					return nil, ErrDuplicateHandle
-				default:
-					return nil, err
-				}
-			case "23514":
-				switch pgErr.ConstraintName {
-				case "project_status_check":
-					return nil, ErrInvalidStatus
-				default:
-					return nil, err
-				}
-			default:
-				return nil, err
-			}
-		default:
-			return nil, err
-		}
+		return nil, mapProjectError(err)
 	}
 
 	return insertedProject, nil
 }
 
 // Get retrieves a project by ID.
-// It returns ErrRecordNotFound when id is invalid or no project exists.
+// Returns ErrRecordNotFound when id is invalid or no project exists.
 func (m *ProjectModel) Get(ctx context.Context, id int64) (*Project, error) {
 	if id < 1 {
 		return nil, ErrRecordNotFound
@@ -160,5 +138,74 @@ func (m *ProjectModel) Delete(ctx context.Context, id int64) error {
 	defer cancel()
 
 	_, err := m.db.Exec(queryCtx, query, id)
+	return err
+}
+
+// Update updates mutable fields of a project.
+// Returns ErrRecordNotFound when id is invalid or no project exists.
+// Returns ErrDuplicateHandle if a project with the given handle already exists.
+// Returns ErrInvalidStatus if the project has an invalid status.
+func (m *ProjectModel) Update(ctx context.Context, project *Project) (*Project, error) {
+	if project.ID < 1 {
+		return nil, ErrRecordNotFound
+	}
+
+	query := `
+		UPDATE projects
+		SET handle = $1, name = $2, status = $3, updated_at = now()
+		WHERE id = $4
+		RETURNING id, owner_id, handle, name, status, created_at, updated_at`
+
+	args := []any{
+		project.Handle,
+		project.Name,
+		project.Status,
+		project.ID,
+	}
+
+	queryCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+
+	var updatedProject Project
+
+	err := m.db.QueryRow(queryCtx, query, args...).Scan(
+		&updatedProject.ID,
+		&updatedProject.OwnerID,
+		&updatedProject.Handle,
+		&updatedProject.Name,
+		&updatedProject.Status,
+		&updatedProject.CreatedAt,
+		&updatedProject.UpdatedAt,
+	)
+
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrRecordNotFound
+		}
+		return nil, mapProjectError(err)
+	}
+
+	return &updatedProject, nil
+}
+
+func mapProjectError(err error) error {
+	var pgErr *pgconn.PgError
+	if !errors.As(err, &pgErr) {
+		return err
+	}
+
+	switch pgErr.Code {
+	case "23505":
+		switch pgErr.ConstraintName {
+		case "projects_handle_key":
+			return ErrDuplicateHandle
+		}
+	case "23514":
+		switch pgErr.ConstraintName {
+		case "project_status_check":
+			return ErrInvalidStatus
+		}
+	}
+
 	return err
 }

@@ -3,10 +3,12 @@ package projects
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/oscargsdev/undr-mono/internal/config"
 	"github.com/oscargsdev/undr-mono/internal/database"
 	"github.com/oscargsdev/undr-mono/internal/users"
@@ -330,6 +332,269 @@ func TestDeleteIDBelowOne(t *testing.T) {
 
 	if !errors.Is(err, ErrRecordNotFound) {
 		t.Errorf("Delete() error = %v; want %v", err, ErrRecordNotFound)
+	}
+}
+
+func TestUpdate(t *testing.T) {
+	projectModel, userModel := getModels(t)
+	testUsers := insertTestUsers(t, userModel, 1)
+
+	project := &Project{
+		OwnerID: testUsers[0].ID,
+		Name:    "test_project_1",
+		Status:  StatusActive,
+	}
+
+	insertedProject, err := projectModel.Insert(t.Context(), project)
+	if err != nil {
+		t.Fatalf("Insert() error = %v; want nil", err)
+	}
+	t.Cleanup(func() {
+		err := projectModel.Delete(context.Background(), insertedProject.ID)
+		if err != nil {
+			t.Errorf("Delete() error = %v; want nil", err)
+		}
+	})
+
+	updatedHandle := "updatedHandle"
+	updatedName := "Updated Name"
+	updatedStatus := StatusInactive
+
+	project.ID = insertedProject.ID
+	project.Handle = updatedHandle
+	project.Name = updatedName
+	project.Status = updatedStatus
+
+	updatedProject, err := projectModel.Update(t.Context(), project)
+	if err != nil {
+		t.Fatalf("Update() error = %v; want nil", err)
+	}
+
+	if updatedProject.ID != insertedProject.ID {
+		t.Errorf("Update() ID = %d; want %d", updatedProject.ID, insertedProject.ID)
+	}
+
+	if updatedProject.OwnerID != insertedProject.OwnerID {
+		t.Errorf("Update() OwnerID = %q; want %q", updatedProject.OwnerID, insertedProject.OwnerID)
+	}
+
+	if updatedProject.Handle != updatedHandle {
+		t.Errorf("Update() Handle = %q; want %q", updatedProject.Handle, updatedHandle)
+	}
+
+	if updatedProject.Name != updatedName {
+		t.Errorf("Update() Name = %q; want %q", updatedProject.Name, updatedName)
+	}
+
+	if updatedProject.Status != updatedStatus {
+		t.Errorf("Update() Status = %q; want %q", updatedProject.Status, updatedStatus)
+	}
+
+	if !updatedProject.CreatedAt.Equal(insertedProject.CreatedAt) {
+		t.Errorf("Update() CreatedAt = %v; want %v", updatedProject.CreatedAt, insertedProject.CreatedAt)
+	}
+
+	if !updatedProject.UpdatedAt.After(insertedProject.UpdatedAt) {
+		t.Errorf("Update() UpdatedAt = %v; want > %v", updatedProject.UpdatedAt, insertedProject.UpdatedAt)
+	}
+}
+
+func TestUpdateProjectNotFound(t *testing.T) {
+	projectModel, userModel := getModels(t)
+	testUsers := insertTestUsers(t, userModel, 1)
+
+	project := &Project{
+		OwnerID: testUsers[0].ID,
+		Handle:  "project1",
+		Name:    "test_project_1",
+		Status:  StatusActive,
+	}
+
+	insertedProject, err := projectModel.Insert(t.Context(), project)
+	if err != nil {
+		t.Fatalf("Insert() error = %v; want nil", err)
+	}
+
+	err = projectModel.Delete(t.Context(), insertedProject.ID)
+	if err != nil {
+		t.Fatalf("Delete() error = %v; want nil", err)
+	}
+
+	updatedHandle := "updatedHandle"
+	updatedName := "Updated Name"
+	updatedStatus := StatusInactive
+
+	project.ID = insertedProject.ID
+	project.Handle = updatedHandle
+	project.Name = updatedName
+	project.Status = updatedStatus
+
+	_, err = projectModel.Update(t.Context(), project)
+	if err == nil {
+		t.Fatalf("Update() error = nil; want %v", ErrRecordNotFound)
+	}
+
+	if !errors.Is(err, ErrRecordNotFound) {
+		t.Errorf("Update() error = %v; want %v", err, ErrRecordNotFound)
+	}
+
+}
+
+func TestUpdateDuplicates(t *testing.T) {
+	projectModel, userModel := getModels(t)
+	testUsers := insertTestUsers(t, userModel, 1)
+
+	handle := "handle"
+
+	project := &Project{
+		OwnerID: testUsers[0].ID,
+		Handle:  handle,
+		Name:    "test_project_1",
+		Status:  StatusActive,
+	}
+
+	project2 := &Project{
+		OwnerID: testUsers[0].ID,
+		Handle:  "anotherHandle",
+		Name:    "test_project_1",
+		Status:  StatusActive,
+	}
+
+	insertedProject, err := projectModel.Insert(t.Context(), project)
+	if err != nil {
+		t.Fatalf("Insert() error = %v; want nil", err)
+	}
+	t.Cleanup(func() {
+		err := projectModel.Delete(context.Background(), insertedProject.ID)
+		if err != nil {
+			t.Errorf("Delete() error = %v; want nil", err)
+		}
+	})
+
+	insertedProject2, err := projectModel.Insert(t.Context(), project2)
+	if err != nil {
+		t.Fatalf("Insert() error = %v; want nil", err)
+	}
+	t.Cleanup(func() {
+		err := projectModel.Delete(context.Background(), insertedProject2.ID)
+		if err != nil {
+			t.Errorf("Delete() error = %v; want nil", err)
+		}
+	})
+
+	insertedProject2.Handle = handle
+
+	_, err = projectModel.Update(t.Context(), insertedProject2)
+	if err == nil {
+		t.Fatalf("Update() error = nil; want %v", ErrDuplicateHandle)
+	}
+
+	if !errors.Is(err, ErrDuplicateHandle) {
+		t.Errorf("Update() error = %v; want %v", err, ErrDuplicateHandle)
+	}
+}
+
+func TestUpdateInvalidStatus(t *testing.T) {
+	projectModel, userModel := getModels(t)
+	testUsers := insertTestUsers(t, userModel, 1)
+
+	project := &Project{
+		OwnerID: testUsers[0].ID,
+		Name:    "test_project_1",
+		Status:  StatusActive,
+	}
+
+	insertedProject, err := projectModel.Insert(t.Context(), project)
+	if err != nil {
+		t.Fatalf("Insert() error = %v; want nil", err)
+	}
+	t.Cleanup(func() {
+		err := projectModel.Delete(context.Background(), insertedProject.ID)
+		if err != nil {
+			t.Errorf("Delete() error = %v; want nil", err)
+		}
+	})
+
+	updatedHandle := "updatedHandle"
+	updatedName := "Updated Name"
+	updatedStatus := "invalid"
+
+	project.ID = insertedProject.ID
+	project.Handle = updatedHandle
+	project.Name = updatedName
+	project.Status = updatedStatus
+
+	_, err = projectModel.Update(t.Context(), project)
+	if err == nil {
+		t.Fatalf("Update() error = nil; want %v", ErrInvalidStatus)
+	}
+
+	if !errors.Is(err, ErrInvalidStatus) {
+		t.Errorf("Update() error = %v; want %v", err, ErrInvalidStatus)
+	}
+}
+
+func TestMapProjectError(t *testing.T) {
+	plainErr := errors.New("plain error")
+	unknownConstraintErr := &pgconn.PgError{
+		Code:           "23505",
+		ConstraintName: "unknown_constraint",
+	}
+	unknownCodeErr := &pgconn.PgError{Code: "99999"}
+
+	tests := []struct {
+		name string
+		err  error
+		want error
+	}{
+		{
+			name: "duplicate handle",
+			err: &pgconn.PgError{
+				Code:           "23505",
+				ConstraintName: "projects_handle_key",
+			},
+			want: ErrDuplicateHandle,
+		},
+		{
+			name: "invalid status",
+			err: &pgconn.PgError{
+				Code:           "23514",
+				ConstraintName: "project_status_check",
+			},
+			want: ErrInvalidStatus,
+		},
+		{
+			name: "wrapped PostgreSQL error",
+			err: fmt.Errorf("wrapped: %w", &pgconn.PgError{
+				Code:           "23505",
+				ConstraintName: "projects_handle_key",
+			}),
+			want: ErrDuplicateHandle,
+		},
+		{
+			name: "unknown constraint",
+			err:  unknownConstraintErr,
+			want: unknownConstraintErr,
+		},
+		{
+			name: "unknown code",
+			err:  unknownCodeErr,
+			want: unknownCodeErr,
+		},
+		{
+			name: "non-PostgreSQL error",
+			err:  plainErr,
+			want: plainErr,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := mapProjectError(tc.err)
+			if got != tc.want {
+				t.Errorf("mapProjectError() error = %v; want %v", got, tc.want)
+			}
+		})
 	}
 }
 
