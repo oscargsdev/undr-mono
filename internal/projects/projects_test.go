@@ -28,6 +28,7 @@ func TestInsert(t *testing.T) {
 				Handle:  "project1",
 				Name:    "test_project_1",
 				Status:  StatusActive,
+				Bio:     "Bio 1",
 			}},
 		{"insert test_project_2",
 			Project{
@@ -35,6 +36,7 @@ func TestInsert(t *testing.T) {
 				Handle:  "project2",
 				Name:    "test_project_2",
 				Status:  StatusLimbo,
+				Bio:     "Bio 2",
 			}},
 		{"insert test_project_3",
 			Project{
@@ -42,6 +44,7 @@ func TestInsert(t *testing.T) {
 				Handle:  "project3",
 				Name:    "test_project_3",
 				Status:  StatusActive,
+				Bio:     "Bio 3",
 			}},
 	}
 
@@ -79,6 +82,10 @@ func TestInsert(t *testing.T) {
 				t.Errorf("Insert() Status = %q; want %q", insertedProject.Status, newProject.Status)
 			}
 
+			if insertedProject.Bio != newProject.Bio {
+				t.Errorf("Insert() Bio = %q; want %q", insertedProject.Bio, newProject.Bio)
+			}
+
 			if insertedProject.CreatedAt.IsZero() {
 				t.Errorf("Insert() CreatedAt is zero; want non-zero")
 			}
@@ -106,6 +113,7 @@ func TestInsertDuplicates(t *testing.T) {
 		Handle:  originalHandle,
 		Name:    originalName,
 		Status:  StatusActive,
+		Bio:     "Bio 1",
 	}
 
 	insertedProject, err := projectModel.Insert(t.Context(), originalProject)
@@ -146,6 +154,7 @@ func TestInsertInvalidStatus(t *testing.T) {
 		Handle:  "project1",
 		Name:    "Project 1",
 		Status:  "invalid",
+		Bio:     "Bio 1",
 	}
 
 	_, err := projectModel.Insert(t.Context(), invalidStatusProject)
@@ -172,6 +181,7 @@ func TestGetProject(t *testing.T) {
 				Handle:  "project1",
 				Name:    "test_project_1",
 				Status:  StatusActive,
+				Bio:     "Bio 1",
 			}},
 		{"get test_project_2",
 			Project{
@@ -179,6 +189,7 @@ func TestGetProject(t *testing.T) {
 				Handle:  "project2",
 				Name:    "test_project_2",
 				Status:  StatusInactive,
+				Bio:     "Bio 2",
 			}},
 		{"get test_project_3",
 			Project{
@@ -186,6 +197,7 @@ func TestGetProject(t *testing.T) {
 				Handle:  "project3",
 				Name:    "test_project_3",
 				Status:  StatusInactive,
+				Bio:     "Bio 3",
 			}},
 	}
 
@@ -227,6 +239,10 @@ func TestGetProject(t *testing.T) {
 				t.Errorf("Get() Status = %q; want %q", retrievedProject.Status, insertedProject.Status)
 			}
 
+			if retrievedProject.Bio != insertedProject.Bio {
+				t.Errorf("Get() Bio = %q; want %q", retrievedProject.Bio, insertedProject.Bio)
+			}
+
 			if !retrievedProject.CreatedAt.Equal(insertedProject.CreatedAt) {
 				t.Errorf("Get() CreatedAt = %v; want %v", retrievedProject.CreatedAt, insertedProject.CreatedAt)
 			}
@@ -261,6 +277,7 @@ func TestGetProjectNonExistent(t *testing.T) {
 		OwnerID: testUsers[0].ID,
 		Name:    "test_project_1",
 		Status:  StatusActive,
+		Bio:     "Bio 1",
 	}
 
 	insertedProject, err := projectModel.Insert(t.Context(), project)
@@ -294,6 +311,7 @@ func TestDelete(t *testing.T) {
 		OwnerID: testUsers[0].ID,
 		Name:    "test_project_1",
 		Status:  StatusActive,
+		Bio:     "Bio 1",
 	}
 
 	insertedProject, err := projectModel.Insert(t.Context(), project)
@@ -343,6 +361,7 @@ func TestUpdate(t *testing.T) {
 		OwnerID: testUsers[0].ID,
 		Name:    "test_project_1",
 		Status:  StatusActive,
+		Bio:     "Bio 1",
 	}
 
 	insertedProject, err := projectModel.Insert(t.Context(), project)
@@ -359,11 +378,13 @@ func TestUpdate(t *testing.T) {
 	updatedHandle := "updatedHandle"
 	updatedName := "Updated Name"
 	updatedStatus := StatusInactive
+	updatedBio := "Updated Bio 1"
 
 	project.ID = insertedProject.ID
 	project.Handle = updatedHandle
 	project.Name = updatedName
 	project.Status = updatedStatus
+	project.Bio = updatedBio
 
 	updatedProject, err := projectModel.Update(t.Context(), project)
 	if err != nil {
@@ -390,6 +411,10 @@ func TestUpdate(t *testing.T) {
 		t.Errorf("Update() Status = %q; want %q", updatedProject.Status, updatedStatus)
 	}
 
+	if updatedProject.Bio != updatedBio {
+		t.Errorf("Update() Bio = %q; want %q", updatedProject.Bio, updatedBio)
+	}
+
 	if !updatedProject.CreatedAt.Equal(insertedProject.CreatedAt) {
 		t.Errorf("Update() CreatedAt = %v; want %v", updatedProject.CreatedAt, insertedProject.CreatedAt)
 	}
@@ -408,6 +433,7 @@ func TestUpdateProjectNotFound(t *testing.T) {
 		Handle:  "project1",
 		Name:    "test_project_1",
 		Status:  StatusActive,
+		Bio:     "Bio 1",
 	}
 
 	insertedProject, err := projectModel.Insert(t.Context(), project)
@@ -423,11 +449,13 @@ func TestUpdateProjectNotFound(t *testing.T) {
 	updatedHandle := "updatedHandle"
 	updatedName := "Updated Name"
 	updatedStatus := StatusInactive
+	updatedBio := "Updated Bio 1"
 
 	project.ID = insertedProject.ID
 	project.Handle = updatedHandle
 	project.Name = updatedName
 	project.Status = updatedStatus
+	project.Bio = updatedBio
 
 	_, err = projectModel.Update(t.Context(), project)
 	if err == nil {
@@ -451,6 +479,7 @@ func TestUpdateDuplicates(t *testing.T) {
 		Handle:  handle,
 		Name:    "test_project_1",
 		Status:  StatusActive,
+		Bio:     "Bio 1",
 	}
 
 	project2 := &Project{
@@ -458,6 +487,7 @@ func TestUpdateDuplicates(t *testing.T) {
 		Handle:  "anotherHandle",
 		Name:    "test_project_1",
 		Status:  StatusActive,
+		Bio:     "Bio 2",
 	}
 
 	insertedProject, err := projectModel.Insert(t.Context(), project)
@@ -502,6 +532,7 @@ func TestUpdateInvalidStatus(t *testing.T) {
 		OwnerID: testUsers[0].ID,
 		Name:    "test_project_1",
 		Status:  StatusActive,
+		Bio:     "Bio 1",
 	}
 
 	insertedProject, err := projectModel.Insert(t.Context(), project)
@@ -518,11 +549,13 @@ func TestUpdateInvalidStatus(t *testing.T) {
 	updatedHandle := "updatedHandle"
 	updatedName := "Updated Name"
 	updatedStatus := "invalid"
+	updatedBio := "Updated Bio"
 
 	project.ID = insertedProject.ID
 	project.Handle = updatedHandle
 	project.Name = updatedName
 	project.Status = updatedStatus
+	project.Bio = updatedBio
 
 	_, err = projectModel.Update(t.Context(), project)
 	if err == nil {

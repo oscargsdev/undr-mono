@@ -4,6 +4,7 @@ CREATE TABLE IF NOT EXISTS projects(
     name text NOT NULL,
     handle text NOT NULL UNIQUE,
     status text NOT NULL,
+    bio text NOT NULL DEFAULT '',
     created_at TIMESTAMP NOT NULL DEFAULT now(),
     updated_at TIMESTAMP NOT NULL DEFAULT now(),
     FOREIGN KEY(owner_id) REFERENCES users(id) ON DELETE CASCADE,

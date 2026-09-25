@@ -38,6 +38,7 @@ type Project struct {
 	Handle    string       `json:"handle"`
 	Name      string       `json:"name"`
 	Status    string       `json:"status"`
+	Bio       string       `json:"bio"`
 	CreatedAt time.Time    `json:"-"`
 	UpdatedAt time.Time    `json:"-"`
 }
@@ -57,11 +58,11 @@ func NewProjectModel(db *pgxpool.Pool) *ProjectModel {
 // Returns ErrInvalidStatus if the project has an invalid status.
 func (m *ProjectModel) Insert(ctx context.Context, project *Project) (*Project, error) {
 	query := `
-		INSERT INTO projects (owner_id, handle, name, status)
-		VALUES ($1, $2, $3, $4)
-		RETURNING id, owner_id, handle, name, status, created_at, updated_at`
+		INSERT INTO projects (owner_id, handle, name, status, bio)
+		VALUES ($1, $2, $3, $4, $5)
+		RETURNING id, owner_id, handle, name, status, bio, created_at, updated_at`
 
-	args := []any{project.OwnerID, project.Handle, project.Name, project.Status}
+	args := []any{project.OwnerID, project.Handle, project.Name, project.Status, project.Bio}
 
 	insertedProject := &Project{}
 
@@ -74,6 +75,7 @@ func (m *ProjectModel) Insert(ctx context.Context, project *Project) (*Project, 
 		&insertedProject.Handle,
 		&insertedProject.Name,
 		&insertedProject.Status,
+		&insertedProject.Bio,
 		&insertedProject.CreatedAt,
 		&insertedProject.UpdatedAt,
 	)
@@ -93,7 +95,7 @@ func (m *ProjectModel) Get(ctx context.Context, id int64) (*Project, error) {
 	}
 
 	query := `
-		SELECT id, owner_id, handle, name, status, created_at, updated_at
+		SELECT id, owner_id, handle, name, status, bio, created_at, updated_at
 		FROM projects
 		WHERE id = $1`
 
@@ -108,6 +110,7 @@ func (m *ProjectModel) Get(ctx context.Context, id int64) (*Project, error) {
 		&project.Handle,
 		&project.Name,
 		&project.Status,
+		&project.Bio,
 		&project.CreatedAt,
 		&project.UpdatedAt,
 	)
@@ -152,14 +155,15 @@ func (m *ProjectModel) Update(ctx context.Context, project *Project) (*Project, 
 
 	query := `
 		UPDATE projects
-		SET handle = $1, name = $2, status = $3, updated_at = now()
-		WHERE id = $4
-		RETURNING id, owner_id, handle, name, status, created_at, updated_at`
+		SET handle = $1, name = $2, status = $3, bio = $4, updated_at = now()
+		WHERE id = $5
+		RETURNING id, owner_id, handle, name, status, bio, created_at, updated_at`
 
 	args := []any{
 		project.Handle,
 		project.Name,
 		project.Status,
+		project.Bio,
 		project.ID,
 	}
 
@@ -174,6 +178,7 @@ func (m *ProjectModel) Update(ctx context.Context, project *Project) (*Project, 
 		&updatedProject.Handle,
 		&updatedProject.Name,
 		&updatedProject.Status,
+		&updatedProject.Bio,
 		&updatedProject.CreatedAt,
 		&updatedProject.UpdatedAt,
 	)
